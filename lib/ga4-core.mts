@@ -1,9 +1,10 @@
+import {queryDates} from './date-range.mts';
 export const properties = {bazi:'550050295',sudoku:'558243778'} as const;
-export type Query={app:keyof typeof properties,days:number,country:string,os:string};
+export type Query={app:keyof typeof properties,days:number,startDate?:string,endDate?:string,country:string,os:string};
 export class GAError extends Error { code:string; status:number; constructor(code:string,status=502){super(code);this.code=code;this.status=status;} }
 export function parseQuery(input:Record<string,unknown>):Query {
- if(typeof input.app!=='string'||!Object.hasOwn(properties,input.app)||![7,14,30].includes(Number(input.days))||!['all','KR','JP','US'].includes(String(input.country))||!['all','android','ios'].includes(String(input.os))) throw new GAError('invalid_query',400);
- return {app:input.app as Query['app'],days:Number(input.days),country:String(input.country),os:String(input.os)};
+ if(typeof input.app!=='string'||!Object.hasOwn(properties,input.app)||!['all','KR','JP','US'].includes(String(input.country))||!['all','android','ios'].includes(String(input.os))) throw new GAError('invalid_query',400);
+ try{return {app:input.app as Query['app'],...queryDates(input),country:String(input.country),os:String(input.os)};}catch{throw new GAError('invalid_query',400);}
 }
 export function reportsBody(q:Query){
  const exact=(fieldName:string,value:string)=>({filter:{fieldName,stringFilter:{matchType:'EXACT',value,caseSensitive:true}}});
@@ -11,8 +12,8 @@ export function reportsBody(q:Query){
  const expressions:unknown[]=[{filter:{fieldName:'platform',inListFilter:{values:['Android','iOS']}}}];
  if(q.country!=='all')expressions.push(exact('countryId',q.country));
  if(q.os!=='all')expressions.push(exact('operatingSystem',q.os==='android'?'Android':'iOS'));
- const base={dateRanges:[{startDate:`${q.days}daysAgo`,endDate:'yesterday'}],dimensionFilter:{andGroup:{expressions}},keepEmptyRows:true};
- return {requests:[{...base,metrics:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'}],limit:'1'}, {...base,dimensions:[{name:'date'}],metrics:[{name:'activeUsers'}],orderBys:[{dimension:{dimensionName:'date'}}],limit:'31'}]};
+ const base={dateRanges:[{startDate:q.startDate||`${q.days}daysAgo`,endDate:q.endDate||'yesterday'}],dimensionFilter:{andGroup:{expressions}},keepEmptyRows:true};
+ return {requests:[{...base,metrics:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'}],limit:'1'}, {...base,dimensions:[{name:'date'}],metrics:[{name:'activeUsers'}],orderBys:[{dimension:{dimensionName:'date'}}],limit:String(q.days)}]};
 }
 const b64=(bytes:Uint8Array)=>btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
 const encode=(value:unknown)=>b64(new TextEncoder().encode(JSON.stringify(value)));
@@ -36,7 +37,7 @@ function metric(row:NonNullable<Report['rows']>[number]|undefined,index:number){
 export function parseReports(body:{reports?:Report[]},q:Query){
  const [total,daily]=body.reports||[];if(!total||!daily)throw new GAError('invalid_response');
  if(total.metricHeaders?.map(m=>m.name).join(',')!=='activeUsers,sessions,eventCount'||daily.metricHeaders?.[0]?.name!=='activeUsers'||daily.dimensionHeaders?.[0]?.name!=='date')throw new GAError('invalid_response');
- if((total.rows?.length||0)>1||(daily.rowCount||0)>31)throw new GAError('invalid_response');
+ if((total.rows?.length||0)>1||(daily.rowCount||0)>q.days)throw new GAError('invalid_response');
  const dailyRows=(daily.rows||[]).map(row=>{const date=row.dimensionValues?.[0]?.value;if(!date||!/^\d{8}$/.test(date))throw new GAError('invalid_response');return {date,active:metric(row,0)};});
  const timezone=total.metadata?.timeZone||daily.metadata?.timeZone||'속성 시간대';
  return {app:q.app,propertyId:properties[q.app],activeUsers:metric(total.rows?.[0],0),sessions:metric(total.rows?.[0],1),events:metric(total.rows?.[0],2),averageDau:Math.round(dailyRows.reduce((s,r)=>s+r.active,0)/q.days),daily:dailyRows,timeZone:timezone,limited:!![total,daily].find(r=>r.metadata?.subjectToThresholding||r.metadata?.dataLossFromOtherRow||r.metadata?.samplingMetadatas?.length),fetchedAt:new Date().toISOString(),days:q.days};

@@ -1,3 +1,4 @@
+import {queryDates,dateMillis} from './date-range.mts';
 // User-provided AdMob inventory. Identifiers are not authentication credentials.
 export const admobPublisherId='pub-4999376453226791';
 export const admobApps=[
@@ -6,10 +7,10 @@ export const admobApps=[
  {app:'sudoku',name:'스도쿠 마스터',os:'android',appId:'ca-app-pub-4999376453226791~7315994561'},
  {app:'sudoku',name:'스도쿠 마스터',os:'ios',appId:'ca-app-pub-4999376453226791~2158003782'},
 ] as const;
-export type AdmobQuery={app:'bazi'|'sudoku';days:number;country:string;os:string};
+export type AdmobQuery={app:'bazi'|'sudoku';days:number;startDate?:string;endDate?:string;country:string;os:string};
 export function admobQuery(v:Record<string,unknown>):AdmobQuery{
- if(!['bazi','sudoku'].includes(String(v.app))||![7,14,30].includes(Number(v.days))||!['all','KR','JP','US'].includes(String(v.country))||!['all','android','ios'].includes(String(v.os)))throw Error('invalid_query');
- return {app:v.app as AdmobQuery['app'],days:Number(v.days),country:String(v.country),os:String(v.os)};
+ if(!['bazi','sudoku'].includes(String(v.app))||!['all','KR','JP','US'].includes(String(v.country))||!['all','android','ios'].includes(String(v.os)))throw Error('invalid_query');
+ return {app:v.app as AdmobQuery['app'],...queryDates(v),country:String(v.country),os:String(v.os)};
 }
 async function checked(response:Response){
  if(response.ok)return response.json();let code=response.status===403?'permission_denied':response.status===401?'reauthorize':response.status===429?'quota_exceeded':'provider_error';
@@ -25,7 +26,7 @@ export function reportBody(q:AdmobQuery,timeZone:string,now=new Date()){
  const date=(ms:number)=>{const d=new Date(ms);return {year:d.getUTCFullYear(),month:d.getUTCMonth()+1,day:d.getUTCDate()};};
  const dimensionFilters=[{dimension:'APP',matchesAny:{values:admobApps.filter(a=>a.app===q.app&&(q.os==='all'||a.os===q.os)).map(a=>a.appId) as string[]}}];
  if(q.country!=='all')dimensionFilters.push({dimension:'COUNTRY',matchesAny:{values:[q.country]}});
- return {reportSpec:{dateRange:{startDate:date(today-q.days*86400000),endDate:date(today-86400000)},dimensions:['DATE','APP','COUNTRY'],metrics:['ESTIMATED_EARNINGS','IMPRESSIONS','CLICKS'],dimensionFilters,localizationSettings:{currencyCode:'USD',languageCode:'en-US'},maxReportRows:100000}};
+ return {reportSpec:{dateRange:{startDate:date(q.startDate?dateMillis(q.startDate):today-q.days*86400000),endDate:date(q.endDate?dateMillis(q.endDate):today-86400000)},dimensions:['DATE','APP','COUNTRY'],metrics:['ESTIMATED_EARNINGS','IMPRESSIONS','CLICKS'],dimensionFilters,localizationSettings:{currencyCode:'USD',languageCode:'en-US'},maxReportRows:100000}};
 }
 export function parseAdmobReport(value:unknown,q:AdmobQuery){
  if(!Array.isArray(value)||!value[0]?.header||!value.at(-1)?.footer)throw Error('invalid_response');
