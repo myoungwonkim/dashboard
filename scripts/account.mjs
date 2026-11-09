@@ -1,0 +1,3 @@
+import {randomBytes,pbkdf2Sync} from 'node:crypto';
+import {prompt,upload} from './prompt.mjs';
+try{const username=(await prompt('로그인 아이디: ')).trim();const password=await prompt('새 비밀번호 (16자 이상, 입력은 표시되지 않습니다): ',true);const confirm=await prompt('비밀번호 확인: ',true);if(!username||username.length>80||password.length<16||password.length>256||password!==confirm)throw Error('아이디 또는 비밀번호 조건을 확인해 주세요.');const salt=randomBytes(32).toString('hex'),hash=pbkdf2Sync(password,salt,100000,32,'sha256').toString('hex');await upload({DASHBOARD_ACCOUNT:JSON.stringify({username,salt,hash})});console.log('로그인 설정 완료. 이전 로그인 세션은 무효화됩니다.');}catch(e){console.error(e.message);process.exitCode=1;}

@@ -1,0 +1,3 @@
+import {webcrypto,randomUUID} from 'node:crypto';
+import {prompt,upload} from './prompt.mjs';
+try{if(await prompt('최초 설치용입니다. 기존 키를 교체하면 저장된 연결을 읽을 수 없습니다. 최초 설치라면 INITIAL 입력: ')!=='INITIAL')throw Error('취소했습니다.');const pair=await webcrypto.subtle.generateKey({name:'RSA-OAEP',modulusLength:3072,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['encrypt','decrypt']);await upload({GA4_ENVELOPE_PRIVATE_KEY:JSON.stringify(await webcrypto.subtle.exportKey('jwk',pair.privateKey)),GA4_ENVELOPE_PUBLIC_KEY:JSON.stringify(await webcrypto.subtle.exportKey('jwk',pair.publicKey)),GA4_ENVELOPE_KEY_ID:randomUUID()});console.log('암호화 키 등록 완료.');}catch(e){console.error(e.message);process.exitCode=1;}

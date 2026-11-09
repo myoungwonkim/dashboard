@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","lib":["ES2023","DOM"],"module":"ESNext","moduleResolution":"Bundler","jsx":"react-jsx","strict":true,"skipLibCheck":true,"noEmit":true,"allowImportingTsExtensions":true,"types":["@cloudflare/workers-types","node"],"paths":{"@/*":["./*"]}},"include":["client","components","lib","db","worker","app/api","vite.config.ts"]}

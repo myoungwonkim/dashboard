@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {encryptAccount,decryptAccount,validateAccount,expectedEmail,expectedProject} from '../lib/ga4-envelope.mts';
+const pair=await crypto.subtle.generateKey({name:'RSA-OAEP',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['encrypt','decrypt']);
+const pub=await crypto.subtle.exportKey('jwk',pair.publicKey),priv=await crypto.subtle.exportKey('jwk',pair.privateKey);
+const account={type:'service_account',client_email:expectedEmail,project_id:expectedProject,private_key:'-----BEGIN PRIVATE KEY-----\nTEST-ONLY-NOT-A-REAL-KEY\n-----END PRIVATE KEY-----'};
+test('encrypted envelope round trip and no plaintext credential in transport',async()=>{const e=await encryptAccount(account,pub,'test');assert.deepEqual(await decryptAccount(e,priv,'test'),account);assert.ok(!JSON.stringify(e).includes('PRIVATE KEY'));assert.ok(!JSON.stringify(e).includes(expectedEmail));});
+test('ciphertext, wrapped key, IV, and key ID tampering are rejected',async()=>{const e=await encryptAccount(account,pub,'test');for(const field of ['ciphertext','wrappedKey','iv']){const v={...e,[field]:(e[field][0]==='A'?'B':'A')+e[field].slice(1)};await assert.rejects(decryptAccount(v,priv,'test'),/invalid_envelope/);}await assert.rejects(decryptAccount(e,priv,'other'),/invalid_envelope/);});
+test('only the expected service account and project can be registered',()=>{for(const v of [{...account,client_email:'other@example.com'},{...account,project_id:'other'},{...account,type:'authorized_user'},null])assert.throws(()=>validateAccount(v),/invalid_account/);});
+test('fresh randomness produces distinct ciphertext for the same credential',async()=>{const a=await encryptAccount(account,pub,'test'),b=await encryptAccount(account,pub,'test');assert.notEqual(a.iv,b.iv);assert.notEqual(a.ciphertext,b.ciphertext);});
+test('extra JSON fields are stripped before encryption',async()=>{const e=await encryptAccount({...account,unexpected:'not-stored'},pub,'test');assert.deepEqual(await decryptAccount(e,priv,'test'),account);});

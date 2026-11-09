@@ -1,0 +1,12 @@
+{
+ "$schema":"node_modules/wrangler/config-schema.json",
+ "name":"nolsoop-dashboard",
+ "main":"worker/index.ts",
+ "compatibility_date":"2026-11-01",
+ "compatibility_flags":["nodejs_compat"],
+ "workers_dev":false,
+ "preview_urls":false,
+ "routes":[{"pattern":"dashboard.nolsoopgames.com","custom_domain":true}],
+ "assets":{"directory":"./dist","binding":"ASSETS","run_worker_first":true,"not_found_handling":"single-page-application"},
+ "d1_databases":[{"binding":"DB","database_name":"nolsoop-dashboard","database_id":"REPLACE_WITH_D1_DATABASE_ID","migrations_dir":"migrations"}]
+}
