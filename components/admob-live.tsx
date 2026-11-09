@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {apps} from '@/lib/demo';
+import {apps} from '@/lib/apps';
 type Data={revenue:number;impressions:number;clicks:number;ecpm:number;currency:string;timeZone:string;fetchedAt:string;limited:boolean};
 type Result={status:'success';data:Data}|{status:'error';message:string};
 export default function AdmobLive({app,days,country,os}:{app?:string;days:number;country:string;os:string}){

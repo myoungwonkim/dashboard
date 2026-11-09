@@ -1,0 +1,1 @@
+export const apps=[{id:'bazi',firebaseProjectId:'bazi-ea78b',ga4PropertyId:'550050295',name:'읽어주는 만세력',pkg:'com.nolsoopgames.bazi',symbol:'命'},{id:'sudoku',firebaseProjectId:'sudoku-master-8998c',ga4PropertyId:'558243778',name:'스도쿠 마스터',pkg:'com.nolsoopgames.sudoku',symbol:'9'}];

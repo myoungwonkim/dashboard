@@ -20,7 +20,7 @@ export default function GA4Setup(){
  }
  return <section className="safenote ga4setup"><div className="sectiontitle"><h2>GA4 연결</h2><span className="status">{setup?.configured?(setup.checks?.every(c=>c.ok)&&setup.checks.length===2?'두 앱 연결 완료':'키 저장 완료'):'등록 대기'}</span></div>
  <p role="status" aria-live="polite">{message}</p>
- {setup?.configured?<><p>등록 시각: {new Date(setup.createdAt!).toLocaleString('ko-KR')}</p><div className="setupactions"><button className="setupbutton" disabled={busy} onClick={()=>void connect()}>{busy?'검사 중…':'권한 다시 검사'}</button><Link href="/?mode=live">실제 데이터 보기 →</Link></div></>:<>
+ {setup?.configured?<><p>등록 시각: {new Date(setup.createdAt!).toLocaleString('ko-KR')}</p><div className="setupactions"><button className="setupbutton" disabled={busy} onClick={()=>void connect()}>{busy?'검사 중…':'권한 다시 검사'}</button><Link href="/">실제 데이터 보기 →</Link></div></>:<>
  <ol><li><a href="https://console.cloud.google.com/iam-admin/serviceaccounts/details/112806435627414481090/keys?project=sudoku-master-8998c" target="_blank" rel="noreferrer">서비스 계정의 키 페이지 열기 ↗</a><p>Google 계정: nolsoop.games@gmail.com</p></li><li>키 추가 → 새 키 만들기 → JSON → 만들기</li><li>다운로드한 JSON 파일을 아래에서 선택한 뒤 연결합니다.</li></ol>
  <p className="accountemail">{expectedEmail}</p>
  <div className="setupactions"><label className="filelabel">JSON 키 파일<input ref={input} type="file" accept=".json,application/json" disabled={!setup||busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label><button className="setupbutton" type="button" disabled={!file||!setup||busy} onClick={()=>void connect()}>{busy?'두 앱 확인 중…':'암호화하여 연결'}</button></div>
