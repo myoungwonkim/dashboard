@@ -6,5 +6,6 @@ dist/
 *.pem
 *credentials*.json
 *secrets*.json
+mockups/
 
 .dev.*

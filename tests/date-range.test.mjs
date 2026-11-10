@@ -27,6 +27,12 @@ test('absolute range overrides days and reaches both GA4 requests and AdMob unch
 });
 test('long range DAU divides by every selected day including empty days',()=>{
  const q=parseQuery({...filters,startDate:'2026-01-01',endDate:'2026-03-31'});
- const data=parseReports({reports:[{metricHeaders:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'}],rows:[{metricValues:[{value:'50'},{value:'100'},{value:'200'}]}]},{metricHeaders:[{name:'activeUsers'}],dimensionHeaders:[{name:'date'}],rowCount:40,rows:Array.from({length:40},(_,i)=>({dimensionValues:[{value:new Date(Date.UTC(2026,0,i+1)).toISOString().slice(0,10).replaceAll('-','')}],metricValues:[{value:'9'}]}))}]},q);
+ const data=parseReports({reports:[
+  {metricHeaders:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'},{name:'newUsers'},{name:'engagedSessions'},{name:'engagementRate'},{name:'averageSessionDuration'},{name:'sessionsPerUser'}],rows:[{metricValues:[{value:'50'},{value:'100'},{value:'200'},{value:'10'},{value:'80'},{value:'0.8'},{value:'30'},{value:'2'}]}]},
+  {metricHeaders:[{name:'activeUsers'},{name:'newUsers'},{name:'sessions'}],dimensionHeaders:[{name:'date'}],rowCount:40,rows:Array.from({length:40},(_,i)=>({dimensionValues:[{value:new Date(Date.UTC(2026,0,i+1)).toISOString().slice(0,10).replaceAll('-','')}],metricValues:[{value:'9'},{value:'1'},{value:'12'}]}))},
+  {metricHeaders:[{name:'newUsers'}],dimensionHeaders:[{name:'firstUserSource'},{name:'firstUserMedium'}],rows:[]},
+  {metricHeaders:[{name:'activeUsers'},{name:'newUsers'}],dimensionHeaders:[{name:'country'}],rows:[]},
+  {metricHeaders:[{name:'activeUsers'}],dimensionHeaders:[{name:'appVersion'}],rows:[]},
+ ]},q);
  assert.equal(data.averageDau,4);assert.equal(data.activeUsers,50);
 });
