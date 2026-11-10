@@ -35,10 +35,15 @@ export async function POST(req:Request){
   const saved=await db.insert(ga4Connection).values({id:'primary',ownerId:user.userId,envelope:JSON.stringify({version:input.version,kid:input.kid,iv:input.iv,wrappedKey:input.wrappedKey,ciphertext:input.ciphertext}),createdAt}).onConflictDoNothing().returning({id:ga4Connection.id});
   if(!saved.length)return json({message:'이미 키가 등록되어 있습니다. 권한 다시 검사를 눌러 주세요.'},409);
  }
- stage='앱별 조회';const checks=await verifyProperties(token),checkedAt=new Date().toISOString();
+ stage='앱별 조회';
+ const {ensureSeedApps,listApps}=await import('@/lib/apps-store.mts');
+ await ensureSeedApps();
+ const registered=await listApps();
+ const targets=registered.filter(a=>a.ga4PropertyId).map(a=>({app:a.id,propertyId:a.ga4PropertyId!}));
+ const checks=await verifyProperties(token,targets),checkedAt=new Date().toISOString();
  await db.update(ga4Connection).set({checks:JSON.stringify(checks),checkedAt}).where(eq(ga4Connection.id,'primary'));
  // Bounded diagnostic codes only: never log tokens, credentials, or Google response bodies.
  console.info(JSON.stringify({event:'ga4_connection_check',checks,checkedAt}));
- return json({configured:true,createdAt,checks,checkedAt,message:checks.every(c=>c.ok)?'두 앱의 GA4 조회를 확인했습니다.':'키는 암호화 저장했습니다. 아래 앱별 검사 결과를 확인해 주세요.'});
+ return json({configured:true,createdAt,checks,checkedAt,message:checks.every(c=>c.ok)?'등록된 앱의 GA4 조회를 확인했습니다.':'키는 암호화 저장했습니다. 아래 앱별 검사 결과를 확인해 주세요.'});
  }catch(error){const code=error instanceof GAError?error.code:'internal_error';console.warn(JSON.stringify({event:'ga4_setup_error',stage,code}));const reason=({authentication_failed:'키가 유효한지 확인해 주세요.',invalid_credentials:'올바른 서비스 계정 JSON 키를 선택해 주세요.',quota_exceeded:'잠시 후 다시 시도해 주세요.'} as Record<string,string>)[code];return json({message:`${stage} 단계에서 실패했습니다. ${reason||'잠시 후 연결 상태를 다시 확인해 주세요.'}`},502);}
 }

@@ -13,7 +13,10 @@
 - [x] 새 서버 암호화 키 등록 및 GA4 JSON 재등록 (사용자 연결 완료 확인)
 - [ ] OAuth 리디렉션 추가 및 AdMob 승인
 - [ ] 실제 계정 데이터와 콘솔 수치 대조
-- [ ] AppsFlyer API 연동
+- [x] 앱 레지스트리(D1)·앱 추가 마법사·동적 `/apps/:slug`
+- [x] GA4·AdMob 일별 추세 차트 및 CTR·Overview 비교표
+- [ ] AppsFlyer API 연동 (무료 Zero — API 제외, ID 메타만)
+- [ ] Play / App Store Connect 연동
 
 검증 제한: 로컬 Wrangler 서버는 실행 환경의 네트워크 인터페이스 오류로 시작되지 않았습니다. 서버 핸들러 통합 테스트는 SQLite와 요청/응답 객체로 검증했으며, 실제 Cloudflare 런타임·브라우저 확인은 운영 배포 후 필요합니다.
 

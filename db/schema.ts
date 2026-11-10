@@ -11,3 +11,22 @@ export const admobConnection=sqliteTable('admob_connection',{
 export const admobOAuthState=sqliteTable('admob_oauth_state',{
  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),cookieHash:text('cookie_hash').notNull(),verifier:text('verifier').notNull(),expiresAt:text('expires_at').notNull(),
 });
+export const apps=sqliteTable('apps',{
+ id:text('id').primaryKey(),
+ name:text('name').notNull(),
+ symbol:text('symbol').notNull().default(''),
+ status:text('status').notNull().default('active'),
+ firebaseProjectId:text('firebase_project_id'),
+ ga4PropertyId:text('ga4_property_id'),
+ androidPkg:text('android_pkg'),
+ iosBundleId:text('ios_bundle_id'),
+ appleAppId:text('apple_app_id'),
+ admobAndroidAppId:text('admob_android_app_id'),
+ admobIosAppId:text('admob_ios_app_id'),
+ afAndroidId:text('af_android_id'),
+ afIosId:text('af_ios_id'),
+ checks:text('checks'),
+ checkedAt:text('checked_at'),
+ createdAt:text('created_at').notNull(),
+ updatedAt:text('updated_at').notNull(),
+});

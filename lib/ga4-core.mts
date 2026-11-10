@@ -1,10 +1,12 @@
 import {queryDates} from './date-range.mts';
+import {SLUG_RE} from './apps.ts';
+/** @deprecated Kept for tests/fixtures; live lookups use the apps registry. */
 export const properties = {bazi:'550050295',sudoku:'558243778'} as const;
-export type Query={app:keyof typeof properties,days:number,startDate?:string,endDate?:string,country:string,os:string};
+export type Query={app:string,days:number,startDate?:string,endDate?:string,country:string,os:string};
 export class GAError extends Error { code:string; status:number; constructor(code:string,status=502){super(code);this.code=code;this.status=status;} }
 export function parseQuery(input:Record<string,unknown>):Query {
- if(typeof input.app!=='string'||!Object.hasOwn(properties,input.app)||!['all','KR','JP','US'].includes(String(input.country))||!['all','android','ios'].includes(String(input.os))) throw new GAError('invalid_query',400);
- try{return {app:input.app as Query['app'],...queryDates(input),country:String(input.country),os:String(input.os)};}catch{throw new GAError('invalid_query',400);}
+ if(typeof input.app!=='string'||!SLUG_RE.test(input.app)||!['all','KR','JP','US'].includes(String(input.country))||!['all','android','ios'].includes(String(input.os))) throw new GAError('invalid_query',400);
+ try{return {app:input.app,...queryDates(input),country:String(input.country),os:String(input.os)};}catch{throw new GAError('invalid_query',400);}
 }
 export function reportsBody(q:Query){
  const exact=(fieldName:string,value:string)=>({filter:{fieldName,stringFilter:{matchType:'EXACT',value,caseSensitive:true}}});
@@ -34,29 +36,35 @@ export async function accessToken(email:string,keyPem:string,fetcher:typeof fetc
 }
 type Report={metricHeaders?:{name:string}[],dimensionHeaders?:{name:string}[],rows?:{metricValues?:{value:string}[],dimensionValues?:{value:string}[]}[],rowCount?:number,metadata?:{timeZone?:string,subjectToThresholding?:boolean,dataLossFromOtherRow?:boolean,samplingMetadatas?:unknown[]}};
 function metric(row:NonNullable<Report['rows']>[number]|undefined,index:number){if(!row)return 0;const value=row.metricValues?.[index]?.value;if(value===undefined||!/^\d+(\.\d+)?$/.test(value))throw new GAError('invalid_response');return Number(value);}
-export function parseReports(body:{reports?:Report[]},q:Query){
+export function parseReports(body:{reports?:Report[]},q:Query,propertyId:string){
  const [total,daily]=body.reports||[];if(!total||!daily)throw new GAError('invalid_response');
  if(total.metricHeaders?.map(m=>m.name).join(',')!=='activeUsers,sessions,eventCount'||daily.metricHeaders?.[0]?.name!=='activeUsers'||daily.dimensionHeaders?.[0]?.name!=='date')throw new GAError('invalid_response');
  if((total.rows?.length||0)>1||(daily.rowCount||0)>q.days)throw new GAError('invalid_response');
  const dailyRows=(daily.rows||[]).map(row=>{const date=row.dimensionValues?.[0]?.value;if(!date||!/^\d{8}$/.test(date))throw new GAError('invalid_response');return {date,active:metric(row,0)};});
  const timezone=total.metadata?.timeZone||daily.metadata?.timeZone||'속성 시간대';
- return {app:q.app,propertyId:properties[q.app],activeUsers:metric(total.rows?.[0],0),sessions:metric(total.rows?.[0],1),events:metric(total.rows?.[0],2),averageDau:Math.round(dailyRows.reduce((s,r)=>s+r.active,0)/q.days),daily:dailyRows,timeZone:timezone,limited:!![total,daily].find(r=>r.metadata?.subjectToThresholding||r.metadata?.dataLossFromOtherRow||r.metadata?.samplingMetadatas?.length),fetchedAt:new Date().toISOString(),days:q.days};
+ return {app:q.app,propertyId,activeUsers:metric(total.rows?.[0],0),sessions:metric(total.rows?.[0],1),events:metric(total.rows?.[0],2),averageDau:Math.round(dailyRows.reduce((s,r)=>s+r.active,0)/q.days),daily:dailyRows,timeZone:timezone,limited:!![total,daily].find(r=>r.metadata?.subjectToThresholding||r.metadata?.dataLossFromOtherRow||r.metadata?.samplingMetadatas?.length),fetchedAt:new Date().toISOString(),days:q.days};
 }
-export async function fetchReport(q:Query,token:string,fetcher:typeof fetch=fetch){
- const response=await fetcher(`https://analyticsdata.googleapis.com/v1beta/properties/${properties[q.app]}:batchRunReports`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(reportsBody(q)),signal:AbortSignal.timeout(15000)});
+export async function fetchReport(q:Query,token:string,propertyIdOrFetcher?:string|typeof fetch,fetcher:typeof fetch=fetch){
+ const propertyId=typeof propertyIdOrFetcher==='string'?propertyIdOrFetcher:undefined;
+ const run=typeof propertyIdOrFetcher==='function'?propertyIdOrFetcher:fetcher;
+ const id=propertyId||(Object.hasOwn(properties,q.app)?properties[q.app as keyof typeof properties]:'');
+ if(!id||!/^\d{6,12}$/.test(id))throw new GAError('invalid_query',400);
+ const response=await run(`https://analyticsdata.googleapis.com/v1beta/properties/${id}:batchRunReports`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(reportsBody(q)),signal:AbortSignal.timeout(15000)});
  if(!response.ok){
  let code=response.status===403?'permission_denied':response.status===429?'quota_exceeded':response.status===401?'authentication_failed':'provider_error';
  // Never forward provider messages or metadata; only recognize documented reason codes.
  if(response.status===403){try{const body=await response.json() as {error?:{details?:{reason?:string}[]}};const reasons=(body.error?.details||[]).map(d=>d.reason);if(reasons.includes('SERVICE_DISABLED'))code='api_disabled';else if(reasons.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT'))code='scope_insufficient';}catch{}}
  throw new GAError(code,response.status===429?429:502);
  }
- return parseReports(await response.json(),q);
+ return parseReports(await response.json(),q,id);
 }
 
-export type PropertyCheck={app:keyof typeof properties;propertyId:string;ok:boolean;code:string};
-export async function verifyProperties(token:string,fetcher:typeof fetch=fetch):Promise<PropertyCheck[]>{
- return Promise.all((['bazi','sudoku'] as const).map(async app=>{
-  try{await fetchReport({app,days:7,country:'all',os:'all'},token,fetcher);return {app,propertyId:properties[app],ok:true,code:'ok'};}
-  catch(error){return {app,propertyId:properties[app],ok:false,code:error instanceof GAError?error.code:'network_error'};}
+export type PropertyCheck={app:string;propertyId:string;ok:boolean;code:string};
+export async function verifyProperties(token:string,targetsOrFetcher?:{app:string;propertyId:string}[]|typeof fetch,fetcher:typeof fetch=fetch):Promise<PropertyCheck[]>{
+ const run=typeof targetsOrFetcher==='function'?targetsOrFetcher:fetcher;
+ const list=Array.isArray(targetsOrFetcher)&&targetsOrFetcher.length?targetsOrFetcher:(['bazi','sudoku'] as const).map(app=>({app,propertyId:properties[app]}));
+ return Promise.all(list.map(async ({app,propertyId})=>{
+  try{await fetchReport({app,days:7,country:'all',os:'all'},token,propertyId,run);return {app,propertyId,ok:true,code:'ok'};}
+  catch(error){return {app,propertyId,ok:false,code:error instanceof GAError?error.code:'network_error'};}
  }));
 }
