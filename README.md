@@ -1,6 +1,6 @@
 # 놀숲 서비스 현황 대시보드
 
-만세력·스도쿠의 GA4 활동 지표와 AdMob 수익을 조회하는 개인용 대시보드입니다. 흑백 중심의 메인 비교 화면과 앱별 상세 화면을 제공합니다. 실제 데이터만 표시하며, 미연결 서비스는 연결 안내를 표시합니다. AppsFlyer는 아직 미연결입니다.
+만세력·스도쿠 등 등록 앱의 GA4·AdMob·Play·App Store 지표를 조회하는 개인용 대시보드입니다. 앱은 D1 레지스트리로 추가합니다. 실제 데이터만 표시하며, 미연결 서비스는 연결 안내만 보입니다. AppsFlyer 무료(Zero)는 API 수집 없이 앱 ID 메타만 보관합니다.
 
 ## 로그인
 
@@ -41,9 +41,11 @@ npm run keys
 
 기존 ChatGPT 대시보드와 새 서버는 별도 DB·암호화 키를 사용합니다. 기존 JSON 비밀 키와 토큰은 이 저장소에 복사하지 않았습니다. 새 도메인에 로그인한 뒤 `/connections`에서 등록합니다.
 
-1. GA4: 기존 서비스 계정 JSON을 새 대시보드에 업로드하고 두 앱의 조회 성공을 확인합니다. GA4 Viewer 권한을 다시 부여할 필요는 없습니다.
-2. Google OAuth 웹 클라이언트에 아래 승인된 리디렉션 URI를 추가합니다. 기존 URI는 기존 대시보드를 계속 쓴다면 유지합니다.
-3. 수정된 OAuth 클라이언트 JSON을 새 대시보드에 업로드하고 Google 계정으로 AdMob 보고서 읽기를 승인합니다.
+1. GA4: 서비스 계정 JSON을 업로드하고 등록 앱 속성 조회 성공을 확인합니다.
+2. Google OAuth 웹 클라이언트에 아래 승인된 리디렉션 URI를 추가한 뒤 AdMob OAuth JSON을 업로드하고 보고서 읽기를 승인합니다.
+3. Play: Console에 서비스 계정 초대 + (선택) GCS 리포트 버킷 이름을 Connections에 등록합니다.
+4. App Store Connect: API Key(.p8)·Issuer ID·Key ID·(선택) Vendor Number를 등록합니다. Analytics ONGOING은 첫 리포트까지 하루 이상 걸릴 수 있습니다.
+5. Connections에서 **스토어 배치**를 실행하거나 cron(UTC 21:00)을 기다립니다.
 
 ```text
 https://dashboard.nolsoopgames.com/api/admob/oauth/return
