@@ -37,6 +37,37 @@ export const storeBatchRuns=sqliteTable('store_batch_runs',{
  status:text('status').notNull(),
  detail:text('detail'),
 });
+export const storeDim=sqliteTable('store_dim',{
+ appId:text('app_id').notNull(),
+ source:text('source').notNull(),
+ dim:text('dim').notNull(),
+ key:text('key').notNull(),
+ date:text('date').notNull(),
+ installs:integer('installs'),
+ ratingAvg:real('rating_avg'),
+ visitors:integer('visitors'),
+ pageViews:integer('page_views'),
+ conversions:integer('conversions'),
+ updatedAt:text('updated_at').notNull(),
+},(t)=>({pk:primaryKey({columns:[t.appId,t.source,t.dim,t.key,t.date]})}));
+export const storePerfDaily=sqliteTable('store_perf_daily',{
+ appId:text('app_id').notNull(),
+ source:text('source').notNull(),
+ date:text('date').notNull(),
+ storeListingVisitors:integer('store_listing_visitors'),
+ storeListingAcquisitions:integer('store_listing_acquisitions'),
+ conversionRate:real('conversion_rate'),
+ updatedAt:text('updated_at').notNull(),
+},(t)=>({pk:primaryKey({columns:[t.appId,t.source,t.date]})}));
+export const ascReportRequests=sqliteTable('asc_report_requests',{
+ id:text('id').primaryKey(),
+ appleAppId:text('apple_app_id').notNull(),
+ requestId:text('request_id').notNull(),
+ accessType:text('access_type').notNull(),
+ createdAt:text('created_at').notNull(),
+ lastCheckedAt:text('last_checked_at'),
+ status:text('status'),
+});
 export const apps=sqliteTable('apps',{
  id:text('id').primaryKey(),
  name:text('name').notNull(),

@@ -5,7 +5,7 @@ import {envelopeConfig} from '@/lib/ga4-context';
 import {unseal} from '@/lib/admob-crypto.mjs';
 import {parseAscQuery,validateAscAccount,ascJwt,fetchAscReport,AscError} from '@/lib/asc-core.mts';
 import {ensureSeedApps,getApp} from '@/lib/apps-store.mts';
-import {loadStoreRange,summarizeStoreDays} from '@/lib/store-batch.mts';
+import {loadStorePerf,loadStoreRange,summarizeStoreDays} from '@/lib/store-batch.mts';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie','X-Content-Type-Options':'nosniff'}});
 function ymd(d:Date){return d.toISOString().slice(0,10).replaceAll('-','');}
@@ -29,11 +29,20 @@ export async function POST(req:Request){
   const stored=await loadStoreRange(app.id,'asc',start,end);
   const summary=summarizeStoreDays(stored);
   const hasBatch=stored.length>0;
+  const perfRows=await loadStorePerf(app.id,'asc',start,end);
+  const perf=perfRows.length?{
+   visitors:perfRows.reduce((s,r)=>s+(r.storeListingVisitors||0),0),
+   acquisitions:perfRows.reduce((s,r)=>s+(r.storeListingAcquisitions||0),0),
+   conversionRate:perfRows.filter(r=>r.conversionRate!=null).slice(-1)[0]?.conversionRate??null,
+   daily:perfRows.map(r=>({date:r.date,visitors:r.storeListingVisitors||0,acquisitions:r.storeListingAcquisitions||0,conversionRate:r.conversionRate})),
+  }:null;
   return json({status:'success',data:{
    ...data,
    downloads:hasBatch?summary.installs:(data.downloads??null),
    daily:hasBatch?summary.daily.map(d=>({date:d.date,downloads:d.installs})):(data.daily||[]),
-   note:hasBatch?'배치 적재된 Sales Report 다운로드 + 실시간 리뷰':data.note,
+   spike:summary.spike,
+   perf,
+   note:hasBatch?'배치(Sales/Analytics) 다운로드·전환 + 실시간 리뷰':data.note,
    limited:!hasBatch&&data.downloads==null,
   }});
  }catch(error){

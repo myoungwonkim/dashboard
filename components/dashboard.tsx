@@ -26,6 +26,7 @@ const tasks=[
 ['GA4·AdMob 심화 지표','완료','newUsers·참여·firstUser·국가·버전·Crash-free·요청/매칭·포맷.'],
 ['AdMob 광고 수익 연동','대기','게시자 ID 등록 완료. OAuth 후 수익·노출·eCPM·CTR.'],
 ['Play / App Store 연동','완료','키 연결·리뷰 실시간·GCS/Sales 배치 적재·일별 차트.'],
+['스토어 분해·전환·급변','완료','국가/버전/트래픽·store performance·ASC Analytics ONGOING·급변 배지.'],
 ['AppsFlyer 유입 연동','제외','무료 Zero — API 수집 없음. 앱 ID 메타만 보관.'],
 ['원본 콘솔 수치 대조','대기','동일 기간·시간대·통화·OS 기준으로 실제 수치 검증.']];
 
@@ -49,7 +50,7 @@ export default function Dashboard({page}:{page:string}){
  const current=apps.find(a=>a.id===page);
  const report=page==='overview'||!!current;
  const title=current?.name||({overview:'서비스 현황',progress:'진행상황',connections:'데이터 연결'} as Record<string,string>)[page]||page;
- const doneBase=10+Number(ga4Verified)+Number(admobVerified);
+ const doneBase=11+Number(ga4Verified)+Number(admobVerified);
  const pageOptions=useMemo(()=>[['overview','서비스 현황'],...apps.map(a=>[a.id,a.name] as [string,string]),['progress','진행상황'],['connections','데이터 연결']],[apps]);
 
  useEffect(()=>{
@@ -88,7 +89,7 @@ export default function Dashboard({page}:{page:string}){
  <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>
  <StoreLive apps={apps} app={current?.id} days={days}/>
  </>}
- {page==='progress'&&<><div className="progresssummary"><div><strong>{doneBase} <span>/ 12</span></strong><p>완료한 작업</p></div><div className="progressbar"><div style={{width:`${doneBase/12*100}%`}}/></div><span>{ga4Verified?'등록 앱 실제 조회 검증 완료':'GA4 연결 및 권한 확인 진행 중'}</span></div>{tasks.map(([name,originalStatus,originalDetail],i)=>{const verified=(name==='GA4 인증 등록 화면'&&ga4Verified)||(name.startsWith('AdMob')&&admobVerified);const status=verified?'완료':originalStatus,detail=verified?(name.startsWith('AdMob')?'실제 AdMob 보고서 조회 성공을 확인했습니다.':'등록된 앱의 실제 GA4 보고서 조회 성공을 확인했습니다.'):originalDetail;return <article className="task" key={name}><span className={'taskicon '+(status==='완료'?'done':'')}>{status==='완료'?<Check size={16}/>:String(i+1).padStart(2,'0')}</span><div><h2>{name}</h2><p>{detail}</p></div><span className="status">{status}</span></article>})}<p className="note">작업이 완료될 때 갱신합니다. AppsFlyer 무료는 API 연동 대상에서 제외합니다.</p></>}
+ {page==='progress'&&<><div className="progresssummary"><div><strong>{doneBase} <span>/ 13</span></strong><p>완료한 작업</p></div><div className="progressbar"><div style={{width:`${doneBase/13*100}%`}}/></div><span>{ga4Verified?'등록 앱 실제 조회 검증 완료':'GA4 연결 및 권한 확인 진행 중'}</span></div>{tasks.map(([name,originalStatus,originalDetail],i)=>{const verified=(name==='GA4 인증 등록 화면'&&ga4Verified)||(name.startsWith('AdMob')&&admobVerified);const status=verified?'완료':originalStatus,detail=verified?(name.startsWith('AdMob')?'실제 AdMob 보고서 조회 성공을 확인했습니다.':'등록된 앱의 실제 GA4 보고서 조회 성공을 확인했습니다.'):originalDetail;return <article className="task" key={name}><span className={'taskicon '+(status==='완료'?'done':'')}>{status==='완료'?<Check size={16}/>:String(i+1).padStart(2,'0')}</span><div><h2>{name}</h2><p>{detail}</p></div><span className="status">{status}</span></article>})}<p className="note">작업이 완료될 때 갱신합니다. AppsFlyer 무료는 API 연동 대상에서 제외합니다.</p></>}
  {page==='connections'&&<>
  {showForm&&<section className="ga4setup"><div className="sectiontitle"><h2>앱 추가</h2></div><AppForm onCancel={()=>setShowForm(false)} onSaved={app=>{setApps(list=>[...list.filter(a=>a.id!==app.id),app]);setShowForm(false);router.push(`/apps/${app.id}`);}}/></section>}
  <div className="sectiontitle"><h2>등록된 앱</h2><span>{apps.length} active</span></div>
@@ -101,5 +102,5 @@ export default function Dashboard({page}:{page:string}){
  ].map(([name,first,second])=><section className="connection" key={name}><div className="sectiontitle"><h2>{name}</h2><span className="status">안내</span></div><p>{first}</p><p>{second}</p></section>)}</div>
  <section className="projectids"><h2>AdMob 게시자</h2><p className="note">게시자 ID: {admobPublisherId} · 앱별 ca-app-pub ID는 앱 행에 저장</p></section>
  </>}
- <nav className="utilitylinks" aria-label="대시보드 관리"><Link href="/progress">진행상황 {doneBase}/12</Link><Link href="/connections">데이터 연결</Link></nav></main></div></div>;
+ <nav className="utilitylinks" aria-label="대시보드 관리"><Link href="/progress">진행상황 {doneBase}/13</Link><Link href="/connections">데이터 연결</Link></nav></main></div></div>;
 }

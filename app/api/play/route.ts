@@ -5,7 +5,7 @@ import {envelopeConfig} from '@/lib/ga4-context';
 import {unseal} from '@/lib/admob-crypto.mjs';
 import {parsePlayQuery,playAccessToken,fetchPlayReport,validatePlayAccount,PlayError} from '@/lib/play-core.mts';
 import {ensureSeedApps,getApp} from '@/lib/apps-store.mts';
-import {loadStoreRange,summarizeStoreDays} from '@/lib/store-batch.mts';
+import {aggregateDims,loadStoreDims,loadStorePerf,loadStoreRange,summarizeStoreDays} from '@/lib/store-batch.mts';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie','X-Content-Type-Options':'nosniff'}});
 function ymd(d:Date){return d.toISOString().slice(0,10).replaceAll('-','');}
@@ -29,13 +29,25 @@ export async function POST(req:Request){
   const stored=await loadStoreRange(app.id,'play',start,end);
   const summary=summarizeStoreDays(stored);
   const hasBatch=stored.length>0;
+  const countries=aggregateDims(await loadStoreDims(app.id,'play','country',start,end));
+  const versions=aggregateDims(await loadStoreDims(app.id,'play','app_version',start,end));
+  const traffic=aggregateDims(await loadStoreDims(app.id,'play','traffic_source',start,end));
+  const perfRows=await loadStorePerf(app.id,'play',start,end);
+  const perf={
+   visitors:perfRows.reduce((s,r)=>s+(r.storeListingVisitors||0),0),
+   acquisitions:perfRows.reduce((s,r)=>s+(r.storeListingAcquisitions||0),0),
+   conversionRate:perfRows.length?perfRows.filter(r=>r.conversionRate!=null).slice(-1)[0]?.conversionRate??null:null,
+   daily:perfRows.map(r=>({date:r.date,visitors:r.storeListingVisitors||0,acquisitions:r.storeListingAcquisitions||0,conversionRate:r.conversionRate})),
+  };
   return json({status:'success',data:{
    ...data,
    installs:hasBatch?summary.installs:null,
    uninstalls:hasBatch?summary.uninstalls:null,
    ratings:summary.ratingAvg!=null?{average:summary.ratingAvg,count:summary.ratingCount||0}:null,
    daily:summary.daily.map(d=>({date:d.date,installs:d.installs})),
-   note:hasBatch?'GCS 배치 설치·평점 + 실시간 리뷰/바이탈':'설치·평점 CSV는 GCS 버킷 연결 후 배치 실행 시 적재됩니다. Connections에서 배치를 실행하세요.',
+   spike:summary.spike,
+   countries,versions,traffic,perf:perfRows.length?perf:null,
+   note:hasBatch?'GCS 배치(설치·평점·국가/버전·스토어 성과) + 실시간 리뷰/바이탈':'설치·평점·분해 CSV는 GCS 버킷 연결 후 배치 실행 시 적재됩니다.',
   }});
  }catch(error){
   const code=error instanceof PlayError?error.code:(error instanceof Error?error.message:'provider_error');
