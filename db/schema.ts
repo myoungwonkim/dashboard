@@ -1,4 +1,4 @@
-import {sqliteTable,text} from 'drizzle-orm/sqlite-core';
+import {sqliteTable,text,integer,real,primaryKey} from 'drizzle-orm/sqlite-core';
 // The service-account private key is encrypted. The wrapping key is a Sites secret.
 export const ga4Connection=sqliteTable('ga4_connection',{
  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),
@@ -18,6 +18,24 @@ export const playConnection=sqliteTable('play_connection',{
 export const ascConnection=sqliteTable('asc_connection',{
  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),
  envelope:text('envelope').notNull(),createdAt:text('created_at').notNull(),verifiedAt:text('verified_at'),checks:text('checks'),
+});
+export const storeDaily=sqliteTable('store_daily',{
+ appId:text('app_id').notNull(),
+ source:text('source').notNull(),
+ date:text('date').notNull(),
+ installs:integer('installs'),
+ uninstalls:integer('uninstalls'),
+ upgrades:integer('upgrades'),
+ ratingAvg:real('rating_avg'),
+ ratingCount:integer('rating_count'),
+ updatedAt:text('updated_at').notNull(),
+},(t)=>({pk:primaryKey({columns:[t.appId,t.source,t.date]})}));
+export const storeBatchRuns=sqliteTable('store_batch_runs',{
+ id:text('id').primaryKey(),
+ startedAt:text('started_at').notNull(),
+ finishedAt:text('finished_at'),
+ status:text('status').notNull(),
+ detail:text('detail'),
 });
 export const apps=sqliteTable('apps',{
  id:text('id').primaryKey(),

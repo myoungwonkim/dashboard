@@ -8,5 +8,6 @@
  "preview_urls":false,
  "routes":[{"pattern":"dashboard.nolsoopgames.com","custom_domain":true,"zone_name":"nolsoopgames.com"}],
  "assets":{"directory":"./dist","binding":"ASSETS","run_worker_first":true,"not_found_handling":"single-page-application"},
- "d1_databases":[{"binding":"DB","database_name":"nolsoop-dashboard","database_id":"96db26e7-4262-4bf8-8ee0-932c52ce1eb3","migrations_dir":"migrations"}]
+ "d1_databases":[{"binding":"DB","database_name":"nolsoop-dashboard","database_id":"96db26e7-4262-4bf8-8ee0-932c52ce1eb3","migrations_dir":"migrations"}],
+ "triggers":{"crons":["0 21 * * *"]}
 }
