@@ -8,7 +8,11 @@ import * as admobSetup from '../app/api/admob/setup/route';
 import * as start from '../app/api/admob/oauth/start/route';
 import * as callback from '../app/api/admob/oauth/return/route';
 import * as appsApi from '../app/api/apps/route';
-const routes:Record<string,Record<string,unknown>>={'/api/ga4':ga4,'/api/ga4/setup':ga4Setup,'/api/admob':admob,'/api/admob/setup':admobSetup,'/api/admob/oauth/start':start,'/api/admob/oauth/return':callback,'/api/apps':appsApi};
+import * as playApi from '../app/api/play/route';
+import * as playSetup from '../app/api/play/setup/route';
+import * as ascApi from '../app/api/asc/route';
+import * as ascSetup from '../app/api/asc/setup/route';
+const routes:Record<string,Record<string,unknown>>={'/api/ga4':ga4,'/api/ga4/setup':ga4Setup,'/api/admob':admob,'/api/admob/setup':admobSetup,'/api/admob/oauth/start':start,'/api/admob/oauth/return':callback,'/api/apps':appsApi,'/api/play':playApi,'/api/play/setup':playSetup,'/api/asc':ascApi,'/api/asc/setup':ascSetup};
 export async function handle(req:Request,env:any):Promise<Response>{
  const url=new URL(req.url),path=url.pathname;
  if(url.hostname==='dashboard.nolsoopgames.com'&&url.protocol!=='https:'){url.protocol='https:';return Response.redirect(url.toString(),308);}

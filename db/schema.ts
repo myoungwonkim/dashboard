@@ -11,6 +11,14 @@ export const admobConnection=sqliteTable('admob_connection',{
 export const admobOAuthState=sqliteTable('admob_oauth_state',{
  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),cookieHash:text('cookie_hash').notNull(),verifier:text('verifier').notNull(),expiresAt:text('expires_at').notNull(),
 });
+export const playConnection=sqliteTable('play_connection',{
+ id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),
+ envelope:text('envelope').notNull(),gcsBucket:text('gcs_bucket'),createdAt:text('created_at').notNull(),verifiedAt:text('verified_at'),checks:text('checks'),
+});
+export const ascConnection=sqliteTable('asc_connection',{
+ id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),
+ envelope:text('envelope').notNull(),createdAt:text('created_at').notNull(),verifiedAt:text('verified_at'),checks:text('checks'),
+});
 export const apps=sqliteTable('apps',{
  id:text('id').primaryKey(),
  name:text('name').notNull(),
