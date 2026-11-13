@@ -29,6 +29,16 @@ test('a failed first property does not prevent checking the second property',asy
  const result=await verifyProperties('token',async url=>{calls.push(url);return new Response('{}',{status:403});});
  assert.equal(calls.length,2);assert.deepEqual(result.map(r=>[r.app,r.ok,r.code]),[['bazi',false,'permission_denied'],['sudoku',false,'permission_denied']]);
 });
+test('setup probe uses a single activeUsers request not the deep P1 batch',async()=>{
+ const {probeProperty}=await import('../lib/ga4-core.mts');
+ let body=null;
+ await probeProperty('550050295','tok',async(_url,options)=>{
+  body=JSON.parse(options.body);
+  return Response.json({reports:[{metricHeaders:[{name:'activeUsers'}],rows:[{metricValues:[{value:'1'}]}]}]});
+ });
+ assert.equal(body.requests.length,1);
+ assert.deepEqual(body.requests[0].metrics,[{name:'activeUsers'}]);
+});
 test('crash report failure still returns main metrics',async()=>{
  let n=0;
  const result=await fetchReport(query,'tok',async(_url,options)=>{

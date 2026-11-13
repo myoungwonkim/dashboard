@@ -106,11 +106,19 @@ export async function fetchReport(q:Query,token:string,propertyIdOrFetcher?:stri
 }
 
 export type PropertyCheck={app:string;propertyId:string;ok:boolean;code:string};
+
+/** Lightweight connection probe — one metric only, so P1 deep reports cannot block setup. */
+export async function probeProperty(propertyId:string,token:string,fetcher:typeof fetch=fetch){
+ if(!/^\d{6,12}$/.test(propertyId))throw new GAError('invalid_query',400);
+ const body={requests:[{dateRanges:[{startDate:'7daysAgo',endDate:'yesterday'}],metrics:[{name:'activeUsers'}],dimensionFilter:{filter:{fieldName:'platform',inListFilter:{values:['Android','iOS']}}},limit:'1'}]};
+ await runBatch(propertyId,token,body,fetcher);
+}
+
 export async function verifyProperties(token:string,targetsOrFetcher?:{app:string;propertyId:string}[]|typeof fetch,fetcher:typeof fetch=fetch):Promise<PropertyCheck[]>{
  const run=typeof targetsOrFetcher==='function'?targetsOrFetcher:fetcher;
  const list=Array.isArray(targetsOrFetcher)&&targetsOrFetcher.length?targetsOrFetcher:(['bazi','sudoku'] as const).map(app=>({app,propertyId:properties[app]}));
  return Promise.all(list.map(async ({app,propertyId})=>{
-  try{await fetchReport({app,days:7,country:'all',os:'all'},token,propertyId,run);return {app,propertyId,ok:true,code:'ok'};}
+  try{await probeProperty(propertyId,token,run);return {app,propertyId,ok:true,code:'ok'};}
   catch(error){return {app,propertyId,ok:false,code:error instanceof GAError?error.code:'network_error'};}
  }));
 }
