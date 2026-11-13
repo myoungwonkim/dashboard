@@ -9,6 +9,8 @@ const messages:Record<string,string>={
  invalid_status:'앱 상태가 올바르지 않습니다.',
  invalid_ga4_property:'GA4 속성 ID 형식을 확인해 주세요.',
  invalid_android_pkg:'Android 패키지명 형식을 확인해 주세요.',
+ invalid_ios_bundle:'iOS 번들 ID 형식을 확인해 주세요.',
+ invalid_apple_app_id:'App Store Apple ID는 숫자만 입력해 주세요.',
  invalid_admob_id:'AdMob 앱 ID 형식을 확인해 주세요.',
  not_found:'앱을 찾을 수 없습니다.',
  conflict:'이미 같은 ID의 앱이 있습니다.',

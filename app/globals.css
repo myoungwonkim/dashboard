@@ -18,6 +18,8 @@
 .appslist{display:grid;gap:12px;margin:8px 0 28px}
 .approw{display:flex;align-items:center;gap:14px;border:1px solid #e5e5e0;border-radius:8px;padding:16px 18px}
 .approw .meta{flex:1;min-width:0}.approw .meta strong{font-weight:500}.approw .meta span{display:block;font-size:11px;color:#999;margin-top:3px}
+.notice.setuphint{margin-top:12px}
+.notice .refresh{margin-left:auto}
 .badges{display:flex;gap:6px;flex-wrap:wrap}
 .pill{display:inline-block;border:1px solid #e5e5e0;padding:3px 8px;border-radius:4px;font-size:10px;color:#777}
 .pill.ok{background:#f4f4f2;color:#333}.pill.warn{color:#999}

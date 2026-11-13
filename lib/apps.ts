@@ -38,6 +38,7 @@ export const RESERVED_SLUGS=new Set(['overview','connections','progress','login'
 export const ADMOB_APP_ID_RE=/^ca-app-pub-\d{16}~\d{10}$/;
 export const GA4_PROPERTY_RE=/^\d{6,12}$/;
 export const PKG_RE=/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
+export const APPLE_APP_ID_RE=/^\d{6,12}$/;
 
 /** Seed rows used by migrations and local fixtures. */
 export const seedApps:AppInput[]=[
@@ -63,13 +64,17 @@ export function validateAppInput(input:Record<string,unknown>,{partial=false}:{p
  if(status!==undefined&&status!=='active'&&status!=='archived')throw Error('invalid_status');
  const ga4PropertyId=input.ga4PropertyId===undefined?undefined:emptyToNull(input.ga4PropertyId);
  if(ga4PropertyId&&!GA4_PROPERTY_RE.test(ga4PropertyId))throw Error('invalid_ga4_property');
- const androidPkg=input.androidPkg===undefined?undefined:emptyToNull(input.androidPkg);
- if(androidPkg&&!PKG_RE.test(androidPkg))throw Error('invalid_android_pkg');
- const admobAndroidAppId=input.admobAndroidAppId===undefined?undefined:emptyToNull(input.admobAndroidAppId);
- const admobIosAppId=input.admobIosAppId===undefined?undefined:emptyToNull(input.admobIosAppId);
- if(admobAndroidAppId&&!ADMOB_APP_ID_RE.test(admobAndroidAppId))throw Error('invalid_admob_id');
- if(admobIosAppId&&!ADMOB_APP_ID_RE.test(admobIosAppId))throw Error('invalid_admob_id');
- return {
+  const androidPkg=input.androidPkg===undefined?undefined:emptyToNull(input.androidPkg);
+  if(androidPkg&&!PKG_RE.test(androidPkg))throw Error('invalid_android_pkg');
+  const iosBundleId=input.iosBundleId===undefined?undefined:emptyToNull(input.iosBundleId);
+  if(iosBundleId&&!PKG_RE.test(iosBundleId))throw Error('invalid_ios_bundle');
+  const appleAppId=input.appleAppId===undefined?undefined:emptyToNull(input.appleAppId);
+  if(appleAppId&&!APPLE_APP_ID_RE.test(appleAppId))throw Error('invalid_apple_app_id');
+  const admobAndroidAppId=input.admobAndroidAppId===undefined?undefined:emptyToNull(input.admobAndroidAppId);
+  const admobIosAppId=input.admobIosAppId===undefined?undefined:emptyToNull(input.admobIosAppId);
+  if(admobAndroidAppId&&!ADMOB_APP_ID_RE.test(admobAndroidAppId))throw Error('invalid_admob_id');
+  if(admobIosAppId&&!ADMOB_APP_ID_RE.test(admobIosAppId))throw Error('invalid_admob_id');
+  return {
   id:partial&&input.id===undefined?'':id,
   name:name??'',
   symbol,
@@ -77,8 +82,8 @@ export function validateAppInput(input:Record<string,unknown>,{partial=false}:{p
   firebaseProjectId:input.firebaseProjectId===undefined?undefined:emptyToNull(input.firebaseProjectId),
   ga4PropertyId,
   androidPkg,
-  iosBundleId:input.iosBundleId===undefined?undefined:emptyToNull(input.iosBundleId),
-  appleAppId:input.appleAppId===undefined?undefined:emptyToNull(input.appleAppId),
+  iosBundleId,
+  appleAppId,
   admobAndroidAppId,
   admobIosAppId,
   afAndroidId:input.afAndroidId===undefined?undefined:emptyToNull(input.afAndroidId),

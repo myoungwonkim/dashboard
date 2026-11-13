@@ -77,9 +77,23 @@ export async function setAppChecks(id:string,checks:unknown):Promise<void>{
 }
 
 export async function ensureSeedApps():Promise<void>{
- const existing=await getDb().select({id:apps.id}).from(apps).all();
- if(existing.length)return;
- for(const app of seedApps)await createApp(app);
+ for(const seed of seedApps){
+  const current=await getApp(seed.id);
+  if(!current){await createApp(seed);continue;}
+  // Fill only empty registry fields from seed so deploy never wipes user edits.
+  const patch:Partial<AppInput>={};
+  if(!current.firebaseProjectId&&seed.firebaseProjectId)patch.firebaseProjectId=seed.firebaseProjectId;
+  if(!current.ga4PropertyId&&seed.ga4PropertyId)patch.ga4PropertyId=seed.ga4PropertyId;
+  if(!current.androidPkg&&seed.androidPkg)patch.androidPkg=seed.androidPkg;
+  if(!current.iosBundleId&&seed.iosBundleId)patch.iosBundleId=seed.iosBundleId;
+  if(!current.appleAppId&&seed.appleAppId)patch.appleAppId=seed.appleAppId;
+  if(!current.admobAndroidAppId&&seed.admobAndroidAppId)patch.admobAndroidAppId=seed.admobAndroidAppId;
+  if(!current.admobIosAppId&&seed.admobIosAppId)patch.admobIosAppId=seed.admobIosAppId;
+  if(!current.afAndroidId&&seed.afAndroidId)patch.afAndroidId=seed.afAndroidId;
+  if(!current.afIosId&&seed.afIosId)patch.afIosId=seed.afIosId;
+  if(!current.symbol&&seed.symbol)patch.symbol=seed.symbol;
+  if(Object.keys(patch).length)await updateApp(seed.id,patch);
+ }
 }
 
 export function admobInventoryFor(app:AppRecord,os:'all'|'android'|'ios'){
