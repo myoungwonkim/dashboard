@@ -13,6 +13,7 @@ type Data={
  countries?:{country:string,activeUsers:number,newUsers:number}[],
  versions?:{version:string,activeUsers:number}[],
  retention?:Retention|null,
+ retentionNote?:string|null,
 };
 type Result={status:'success',data:Data}|{status:'error',message:string};
 function fmtRate(v?:number|null){return v==null?'—':(v*100).toFixed(1)+'%';}
@@ -56,13 +57,20 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{ap
  ].map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><small>시간대 {result.data.timeZone} · 조회 {new Date(result.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST{result.data.crashAffectedUsers!=null?` · 크래시 영향 ${result.data.crashAffectedUsers.toLocaleString()}명`:''}</small>{result.data.limited&&<p>임계값 또는 샘플링 등이 적용된 보고서입니다.</p>}</>}</article>})}
  </div>
  {!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 활성 · 신규 사용자</h2><span>GA4</span></div><TrendChart series={[...chartSeries,...newUserSeries]}/></div>}
+ {!loading&&targets.map(a=>{
+  const r=results[a.id];if(!r||r.status!=='success')return null;
+  const ret=r.data.retention;
+  if(ret&&ret.rows.length){
+   const offs=SHOW_OFFSETS.filter(d=>d<=ret.summary.endOffset);
+   return <div className="panel" style={{marginTop:20}} key={a.id+'-ret'}><div className="sectiontitle"><h2>일별 코호트 리텐션</h2><span>{a.name} · D0–D{ret.summary.endOffset} · {ret.summary.cohorts}코호트</span></div>
+    <p className="note">행=첫 세션일 · 열=경과일 · 평균 D1 {fmtRate(ret.summary.d1)} · D7 {fmtRate(ret.summary.d7)} · D14 {fmtRate(ret.summary.d14)} · D30 {fmtRate(ret.summary.d30)}{r.data.retentionNote?` · ${r.data.retentionNote}`:''}</p>
+    <div className="tablewrap retentionwrap"><table className="retention"><thead><tr><th>코호트</th><th>유저</th>{offs.map(d=><th key={d}>D{d}</th>)}</tr></thead>
+    <tbody>{ret.rows.map(row=><tr key={row.cohort}><td>{fmtCohort(row.cohort)}</td><td>{row.users?row.users.toLocaleString():'—'}</td>{offs.map(d=>{const v=row.rates[d]??null;return <td key={d} style={heat(v)}>{fmtRate(v)}</td>;})}</tr>)}</tbody></table></div>
+   </div>;
+  }
+  return <p className="note" key={a.id+'-ret-miss'}>{a.name}: {r.data.retentionNote||'코호트 리텐션을 불러오지 못했습니다. 기간을 7일 이상으로 두거나 앱 상세에서 다시 확인하세요.'}</p>;
+ })}
  {detailData&&!loading&&<>
- {detailData.retention&&!!detailData.retention.rows.length&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 코호트 리텐션</h2><span>GA4 · D0–D{detailData.retention.summary.endOffset} · {detailData.retention.summary.cohorts}코호트</span></div>
-  <p className="note">행=첫 세션일(코호트) · 열=경과일 · 값은 코호트 잔존율. 평균 D1 {fmtRate(detailData.retention.summary.d1)} · D7 {fmtRate(detailData.retention.summary.d7)} · D14 {fmtRate(detailData.retention.summary.d14)} · D30 {fmtRate(detailData.retention.summary.d30)}</p>
-  <div className="tablewrap retentionwrap"><table className="retention"><thead><tr><th>코호트</th><th>유저</th>{SHOW_OFFSETS.filter(d=>d<=detailData.retention!.summary.endOffset).map(d=><th key={d}>D{d}</th>)}</tr></thead>
-  <tbody>{detailData.retention.rows.map(r=><tr key={r.cohort}><td>{fmtCohort(r.cohort)}</td><td>{r.users?r.users.toLocaleString():'—'}</td>{SHOW_OFFSETS.filter(d=>d<=detailData.retention!.summary.endOffset).map(d=>{const v=r.rates[d]??null;return <td key={d} style={heat(v)}>{fmtRate(v)}</td>;})}</tr>)}</tbody></table></div>
- </div>}
- {!detailData.retention&&<p className="note">코호트 리텐션을 불러오지 못했습니다. 기간을 늘리거나 GA4 속성 권한을 확인하세요.</p>}
  {!!detailData.firstUser?.length&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>유입 (firstUserSource / Medium)</h2><span>AF 대체 · Top 10</span></div><div className="tablewrap"><table><thead><tr><th>소스</th><th>매체</th><th>신규</th></tr></thead><tbody>{detailData.firstUser.map(r=><tr key={r.source+'/'+r.medium}><td>{r.source}</td><td>{r.medium}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
  {!!detailData.countries?.length&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>국가</h2><span>활성 · 신규</span></div><div className="tablewrap"><table><thead><tr><th>국가</th><th>활성</th><th>신규</th></tr></thead><tbody>{detailData.countries.map(r=><tr key={r.country}><td>{r.country}</td><td>{r.activeUsers.toLocaleString()}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
  {!!detailData.versions?.length&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>앱 버전</h2><span>활성 사용자</span></div><div className="tablewrap"><table><thead><tr><th>버전</th><th>활성</th></tr></thead><tbody>{detailData.versions.map(r=><tr key={r.version}><td>{r.version}</td><td>{r.activeUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}

@@ -1,7 +1,7 @@
 import {queryDates} from './date-range.mts';
 import {SLUG_RE} from './apps.ts';
 import {isCountryFilter} from './countries.mts';
-import {cohortReportBody,parseCohortReport,type RetentionData} from './ga4-cohort.mts';
+import {fetchCohortRetention,type RetentionData} from './ga4-cohort.mts';
 /** @deprecated Kept for tests/fixtures; live lookups use the apps registry. */
 export const properties = {bazi:'550050295',sudoku:'558243778'} as const;
 export type Query={app:string,days:number,startDate?:string,endDate?:string,country:string,os:string};
@@ -182,12 +182,12 @@ export async function fetchReport(q:Query,token:string,propertyIdOrFetcher?:stri
  }
  if(!base)throw last instanceof GAError?last:new GAError('invalid_response');
  // Daily cohort retention — soft-fail so main KPIs still return.
- let retention:RetentionData|null=null;
+ let retention:RetentionData|null=null;let retentionNote:string|null=null;
  try{
-  const cohort=await run(`https://analyticsdata.googleapis.com/v1beta/properties/${id}:runReport`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(cohortReportBody(q)),signal:AbortSignal.timeout(25000)});
-  if(cohort.ok)retention=parseCohortReport(await cohort.json());
- }catch{retention=null;}
- return {...base,retention};
+  const cohort=await fetchCohortRetention(id,token,q,run);
+  retention=cohort.retention;retentionNote=cohort.note;
+ }catch{retention=null;retentionNote='리텐션을 불러오지 못했습니다.';}
+ return {...base,retention,retentionNote};
 }
 
 export type PropertyCheck={app:string;propertyId:string;ok:boolean;code:string};

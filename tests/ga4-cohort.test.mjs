@@ -10,12 +10,13 @@ test('eachDayInclusive lists every day',()=>{
  assert.deepEqual(eachDayInclusive('2024-01-01','2024-01-03'),['2024-01-01','2024-01-02','2024-01-03']);
 });
 
-test('cohort body uses single-day cohorts and daily offset',()=>{
+test('cohort body uses retention expression and single-day cohorts',()=>{
  const body=cohortReportBody({app:'bazi',days:30,startDate:'2024-01-01',endDate:'2024-01-30',country:'all',os:'android'});
  assert.equal(body.cohortSpec.cohortsRange.granularity,'DAILY');
  assert.ok(body.cohortSpec.cohorts.length<=14);
  assert.equal(body.cohortSpec.cohorts[0].dateRange.startDate,body.cohortSpec.cohorts[0].dateRange.endDate);
  assert.equal(body.cohortSpec.cohortsRange.endOffset,14);
+ assert.equal(body.metrics[2].expression,'cohortActiveUsers/cohortTotalUsers');
  assert.ok(body.dimensionFilter.andGroup.expressions.some(e=>e.filter?.fieldName==='operatingSystem'));
 });
 

@@ -25,20 +25,31 @@ function avgAt(rows:RetentionRow[],day:number){
  return vals.reduce((s,v)=>s+v,0)/vals.length;
 }
 
+function dimensionFilter(q:Query,includeAudienceFilters:boolean){
+ const expressions:unknown[]=[{filter:{fieldName:'platform',inListFilter:{values:['Android','iOS']}}}];
+ if(includeAudienceFilters){
+  if(q.country!=='all')expressions.push({filter:{fieldName:'countryId',stringFilter:{matchType:'EXACT',value:q.country,caseSensitive:true}}});
+  if(q.os!=='all')expressions.push({filter:{fieldName:'operatingSystem',stringFilter:{matchType:'EXACT',value:q.os==='android'?'Android':'iOS',caseSensitive:true}}});
+ }
+ return {andGroup:{expressions}};
+}
+
 /** Soft-fail body: one cohort per acquisition day (DAILY requires single-day ranges). */
-export function cohortReportBody(q:Query,now=new Date()){
+export function cohortReportBody(q:Query,now=new Date(),opts?:{audienceFilters?:boolean}){
  const {startDate,endDate}=cohortAbsoluteRange(q,now);
  const all=eachDayInclusive(startDate,endDate);
  const cohortDates=all.slice(-14); // keep request size bounded
  const span=Math.max(1,Math.round((utcMidnight(endDate)-utcMidnight(startDate))/DAY)+1);
  const endOffset=span>=45?30:span>=21?14:7;
- const expressions:unknown[]=[{filter:{fieldName:'platform',inListFilter:{values:['Android','iOS']}}}];
- if(q.country!=='all')expressions.push({filter:{fieldName:'countryId',stringFilter:{matchType:'EXACT',value:q.country,caseSensitive:true}}});
- if(q.os!=='all')expressions.push({filter:{fieldName:'operatingSystem',stringFilter:{matchType:'EXACT',value:q.os==='android'?'Android':'iOS',caseSensitive:true}}});
+ // cohortRetentionRate is NOT a built-in metric — must be an expression.
  return {
   dimensions:[{name:'cohort'},{name:'cohortNthDay'}],
-  metrics:[{name:'cohortActiveUsers'},{name:'cohortTotalUsers'},{name:'cohortRetentionRate'}],
-  dimensionFilter:{andGroup:{expressions}},
+  metrics:[
+   {name:'cohortActiveUsers'},
+   {name:'cohortTotalUsers'},
+   {name:'cohortRetentionRate',expression:'cohortActiveUsers/cohortTotalUsers'},
+  ],
+  dimensionFilter:dimensionFilter(q,opts?.audienceFilters!==false),
   cohortSpec:{
    cohorts:cohortDates.map(d=>({name:d,dimension:'firstSessionDate',dateRange:{startDate:d,endDate:d}})),
    cohortsRange:{granularity:'DAILY',startOffset:0,endOffset},
@@ -60,23 +71,27 @@ export function parseCohortReport(body:unknown):RetentionData|null{
  if(!report?.metricHeaders||!report.dimensionHeaders)return null;
  const m=report.metricHeaders.map(h=>h.name);
  const d=report.dimensionHeaders.map(h=>h.name);
- if(d.join(',')!=='cohort,cohortNthDay')return null;
+ if(!d.includes('cohort')||!d.includes('cohortNthDay'))return null;
+ const iCohort=d.indexOf('cohort');
+ const iNth=d.indexOf('cohortNthDay');
  const iActive=m.indexOf('cohortActiveUsers');
  const iTotal=m.indexOf('cohortTotalUsers');
- const iRate=m.indexOf('cohortRetentionRate');
- if(iActive<0||iTotal<0||iRate<0)return null;
+ const iRate=m.findIndex(name=>/retention|fraction/i.test(name));
+ if(iActive<0||iTotal<0)return null;
  const byCohort=new Map<string,{users:number;rates:Record<number,number|null>}>();
  let maxOffset=0;
  for(const row of report.rows||[]){
-  const cohort=row.dimensionValues?.[0]?.value;
-  const nthRaw=row.dimensionValues?.[1]?.value;
+  const cohort=row.dimensionValues?.[iCohort]?.value;
+  const nthRaw=row.dimensionValues?.[iNth]?.value;
   if(!cohort||nthRaw==null)continue;
   const nth=Number(String(nthRaw).replace(/^0+(?=\d)/,''));
   if(!Number.isFinite(nth)||nth<0)continue;
   maxOffset=Math.max(maxOffset,nth);
   const bucket=byCohort.get(cohort)||{users:0,rates:{}};
+  const active=num(row.metricValues?.[iActive]?.value);
   const total=num(row.metricValues?.[iTotal]?.value);
-  const rate=num(row.metricValues?.[iRate]?.value);
+  let rate=iRate>=0?num(row.metricValues?.[iRate]?.value):null;
+  if(rate==null&&active!=null&&total!=null&&total>0)rate=active/total;
   if(nth===0&&total!=null)bucket.users=Math.max(bucket.users,total);
   bucket.rates[nth]=rate;
   byCohort.set(cohort,bucket);
@@ -93,4 +108,28 @@ export function parseCohortReport(body:unknown):RetentionData|null{
   offsets,
   summary:{d1:avgAt(rows,1),d7:avgAt(rows,7),d14:avgAt(rows,14),d30:avgAt(rows,30),cohorts:rows.length,endOffset:maxOffset},
  };
+}
+
+/** Fetch cohort retention; retries without country/OS filters if the first attempt fails. */
+export async function fetchCohortRetention(propertyId:string,token:string,q:Query,fetcher:typeof fetch=fetch):Promise<{retention:RetentionData|null;note:string|null}>{
+ const attempts=[{audienceFilters:true as const},{audienceFilters:false as const}];
+ let lastStatus=0;
+ for(const opts of attempts){
+  try{
+   const res=await fetcher(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,{
+    method:'POST',
+    headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify(cohortReportBody(q,undefined,opts)),
+    signal:AbortSignal.timeout(25000),
+   });
+   lastStatus=res.status;
+   if(!res.ok)continue;
+   const parsed=parseCohortReport(await res.json());
+   if(parsed)return {retention:parsed,note:opts.audienceFilters?null:'국가/OS 필터 없이 집계한 리텐션입니다.'};
+  }catch{/* try next */}
+ }
+ if(lastStatus===403)return {retention:null,note:'리텐션 조회 권한이 없습니다.'};
+ if(lastStatus===400)return {retention:null,note:'리텐션 요청이 거절되었습니다. 기간을 7일 이상으로 바꿔 보세요.'};
+ if(lastStatus)return {retention:null,note:`리텐션 조회 실패 (HTTP ${lastStatus}).`};
+ return {retention:null,note:'리텐션을 불러오지 못했습니다.'};
 }
