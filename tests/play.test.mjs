@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validatePlayAccount,parseInstallCsv,parseReviews,parseVitals,parsePlayQuery} from '../lib/play-core.mts';
+import {validatePlayAccount,parseInstallCsv,parseReviews,parseVitals,parsePlayQuery,parseAcquisitionInstalls} from '../lib/play-core.mts';
 
 test('Play account validation requires service account shape',()=>{
  assert.throws(()=>validatePlayAccount({type:'user'}));
@@ -31,4 +31,14 @@ test('reviews and vitals parsers reject malformed payloads',()=>{
 test('play query accepts registry slugs only',()=>{
  assert.equal(parsePlayQuery({app:'bazi',days:7}).app,'bazi');
  assert.throws(()=>parsePlayQuery({app:'550050295',days:7}));
+});
+
+test('acquisition install parser sums daily metric rows',()=>{
+ const parsed=parseAcquisitionInstalls({rows:[
+  {startTime:{year:2026,month:11,day:1},metrics:[{metric:'newUsers',decimalValue:'4'}]},
+  {startTime:{year:2026,month:11,day:2},metrics:[{metric:'newUsers',decimalValue:'6'}]},
+ ]});
+ assert.equal(parsed?.installs,10);
+ assert.equal(parsed?.daily[0].date,'20261101');
+ assert.equal(parseAcquisitionInstalls({rows:[]}),null);
 });

@@ -6,9 +6,11 @@ import {admobQuery,reportBody} from '../lib/admob-core.mts';
 const filters={app:'bazi',country:'all',os:'all'};
 test('presets handle Monday, year boundary and leap February',()=>{
  const now=new Date(2026,10,9,12);
+ assert.deepEqual(presetRange('today',now),{startDate:'2026-11-09',endDate:'2026-11-09'});
  assert.deepEqual(presetRange('week',now),{startDate:'2026-11-02',endDate:'2026-11-08'});
  assert.deepEqual(presetRange('7',now),{startDate:'2026-11-02',endDate:'2026-11-08'});
  assert.deepEqual(presetRange('7today',now),{startDate:'2026-11-02',endDate:'2026-11-09'});
+ assert.deepEqual(presetRange('14',now),{startDate:'2026-10-26',endDate:'2026-11-08'});
  assert.deepEqual(presetRange('month',now),{startDate:'2026-11-01',endDate:'2026-11-09'});
  assert.deepEqual(presetRange('lastMonth',new Date(2024,2,1)),{startDate:'2024-02-01',endDate:'2024-02-29'});
  assert.deepEqual(presetRange('3months',new Date(2026,0,5)),{startDate:'2025-10-01',endDate:'2025-12-31'});

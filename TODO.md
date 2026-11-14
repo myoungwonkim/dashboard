@@ -17,6 +17,8 @@
 - [x] GA4·AdMob 일별 추세 차트 및 CTR·Overview 비교표
 - [x] GA4·AdMob 심화 (newUsers·firstUser·참여·Crash-free·매칭률·포맷·국가)
 - [x] Play / ASC 계정 연결 UI·암호화 저장·리포트 API (설치 CSV는 배치)
+- [x] Play 설치: Reporting API soft-fail + GCS 실시간 CSV + 배치 enrichment
+- [x] 세션 30일·아이디 기억·favicon·오늘/14일 프리셋·국가 확장·차트 선/막대
 - [x] Play GCS 설치·평점 CSV / ASC Sales Report 일 배치→D1 + cron
 - [x] Play 국가·버전·트래픽·store_performance / ASC Analytics ONGOING / 급변 배지 (P3)
 - [x] Overview/Connections 빈 상태·앱 수정·Progress 코드완료 표시

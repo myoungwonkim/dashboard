@@ -17,14 +17,16 @@ export function queryDates(v:Record<string,unknown>):{days:number;startDate?:str
  if(![7,14,30].includes(Number(v.days)))throw Error('invalid_query');
  return {days:Number(v.days)};
 }
-export const presets=[['yesterday','어제'],['7','최근 7일'],['7today','최근 7일 + 오늘'],['week','지난주'],['30','최근 30일'],['month','이번 달'],['lastMonth','지난달'],['2months','지난 2개월'],['3months','지난 3개월']] as const;
+export const presets=[['today','오늘'],['yesterday','어제'],['7','최근 7일'],['7today','최근 7일 + 오늘'],['14','최근 14일'],['week','지난주'],['30','최근 30일'],['month','이번 달'],['lastMonth','지난달'],['2months','지난 2개월'],['3months','지난 3개월']] as const;
 export function presetRange(id:string,now=new Date()):DateRange{
  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
  const shift=(days:number)=>new Date(today.getFullYear(),today.getMonth(),today.getDate()+days);
  let start=shift(-7),end=shift(-1);
  switch(id){
+ case 'today':start=today;end=today;break;
  case 'yesterday':start=end;break;
  case '7today':end=today;break;
+ case '14':start=shift(-14);break;
  case 'week':{const monday=-(today.getDay()+6)%7;start=shift(monday-7);end=shift(monday-1);break;}
  case '30':start=shift(-30);break;
  case 'month':start=new Date(today.getFullYear(),today.getMonth(),1);end=today;break;

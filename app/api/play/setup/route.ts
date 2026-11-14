@@ -1,3 +1,4 @@
+import {eq} from 'drizzle-orm';
 import {getCurrentUser} from '@/worker/identity';
 import {getDb} from '@/db';
 import {playConnection} from '@/db/schema';
@@ -21,9 +22,17 @@ export async function POST(req:Request){
   if(Number(req.headers.get('content-length')||0)>40000)return json({message:'파일 크기가 너무 큽니다.'},413);
   const body=await req.text();if(body.length>40000)return json({message:'파일 크기가 너무 큽니다.'},413);
   let input;try{input=JSON.parse(body);}catch{return json({message:'잘못된 요청입니다.'},400);}
-  const db=getDb();const existing=await db.select({id:playConnection.id}).from(playConnection).get();
-  if(existing&&input?.action!=='replace')return json({message:'이미 Play 키가 등록되어 있습니다.'},409);
+  const db=getDb();const existing=await db.select().from(playConnection).get();
   const config=envelopeConfig();
+  if(input?.action==='bucket'){
+   if(!existing)return json({message:'Play 키를 먼저 등록해 주세요.'},400);
+   let bucket:string|null=null;
+   try{bucket=validatePlayAccount(await unseal(JSON.parse(existing.envelope),JSON.parse(config.privateKey),config.kid,'play'),input.gcsBucket).gcsBucket||null;}
+   catch{return json({message:'버킷 이름이 올바른지 확인해 주세요. 예: pubsite_prod_rev_…'},400);}
+   await db.update(playConnection).set({gcsBucket:bucket}).where(eq(playConnection.id,'primary'));
+   return json({configured:true,gcsBucket:bucket,createdAt:existing.createdAt,verifiedAt:existing.verifiedAt,message:bucket?'GCS 버킷을 저장했습니다. 스토어 배치를 실행하세요.':'GCS 버킷을 제거했습니다.'});
+  }
+  if(existing&&input?.action!=='replace')return json({message:'이미 Play 키가 등록되어 있습니다.'},409);
   let account;
   try{
    if(input?.version===1&&input.ciphertext){

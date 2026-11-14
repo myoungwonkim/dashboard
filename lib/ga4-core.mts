@@ -1,11 +1,12 @@
 import {queryDates} from './date-range.mts';
 import {SLUG_RE} from './apps.ts';
+import {isCountryFilter} from './countries.mts';
 /** @deprecated Kept for tests/fixtures; live lookups use the apps registry. */
 export const properties = {bazi:'550050295',sudoku:'558243778'} as const;
 export type Query={app:string,days:number,startDate?:string,endDate?:string,country:string,os:string};
 export class GAError extends Error { code:string; status:number; constructor(code:string,status=502){super(code);this.code=code;this.status=status;} }
 export function parseQuery(input:Record<string,unknown>):Query {
- if(typeof input.app!=='string'||!SLUG_RE.test(input.app)||!['all','KR','JP','US'].includes(String(input.country))||!['all','android','ios'].includes(String(input.os))) throw new GAError('invalid_query',400);
+ if(typeof input.app!=='string'||!SLUG_RE.test(input.app)||!isCountryFilter(input.country)||!['all','android','ios'].includes(String(input.os))) throw new GAError('invalid_query',400);
  try{return {app:input.app,...queryDates(input),country:String(input.country),os:String(input.os)};}catch{throw new GAError('invalid_query',400);}
 }
 function dimensionFilter(q:Query){

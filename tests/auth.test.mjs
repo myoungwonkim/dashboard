@@ -5,7 +5,31 @@ import {readFileSync} from 'node:fs';
 import {login,session,passwordHash,randomToken,digest,account,equal} from '../worker/auth.mts';
 async function fixture(){const sql=new DatabaseSync(':memory:');sql.exec(readFileSync(new URL('../migrations/0003_auth.sql',import.meta.url),'utf8'));const DB={prepare(query){let args=[];return {bind(...values){args=values;return this;},async first(){return sql.prepare(query).get(...args);},async run(){return sql.prepare(query).run(...args);}};},batch(stmts){return Promise.all(stmts.map(s=>s.run()));}};const salt=randomToken();return {sql,DB,DASHBOARD_ACCOUNT:JSON.stringify({username:'owner',salt,hash:await passwordHash('a-unique-long-password',salt)})};}
 const req=(body='username=owner&password=a-unique-long-password',origin='https://dashboard.nolsoopgames.com')=>new Request('https://dashboard.nolsoopgames.com/api/auth/login',{method:'POST',headers:{Origin:origin,'CF-Connecting-IP':'192.0.2.1'},body});
-test('successful login creates opaque server session and secure cookie; rotation invalidates it',async()=>{const env=await fixture(),response=await login(req(),env);assert.equal(response.status,303);assert.equal(response.headers.get('location'),'/');const cookie=response.headers.get('set-cookie');assert.match(cookie,/HttpOnly; Secure; SameSite=Lax/);const request=new Request('https://dashboard.nolsoopgames.com/',{headers:{cookie}});assert.equal(await session(request,env),true);const stored=env.sql.prepare('SELECT id FROM dashboard_sessions').get();assert.ok(!cookie.includes(stored.id));env.DASHBOARD_ACCOUNT+=' ';assert.equal(await session(request,env),false);});
+function cookiesOf(response){return typeof response.headers.getSetCookie==='function'?response.headers.getSetCookie():[response.headers.get('set-cookie')].filter(Boolean);}
+test('successful login creates opaque server session and secure cookie; rotation invalidates it',async()=>{
+ const env=await fixture(),response=await login(req(),env);
+ assert.equal(response.status,303);assert.equal(response.headers.get('location'),'/');
+ const cookies=cookiesOf(response),joined=cookies.join('\n');
+ assert.match(joined,/HttpOnly; Secure; SameSite=Lax/);
+ assert.match(joined,/__Host-dashboard=[a-f0-9]{64};.*Max-Age=28800/);
+ assert.match(joined,/dashboard-user=owner/);
+ const sessionCookie=cookies.find(c=>c.startsWith('__Host-dashboard='));
+ const request=new Request('https://dashboard.nolsoopgames.com/',{headers:{cookie:sessionCookie.split(';')[0]}});
+ assert.equal(await session(request,env),true);
+ const stored=env.sql.prepare('SELECT id FROM dashboard_sessions').get();
+ assert.ok(!joined.includes(stored.id));
+ env.DASHBOARD_ACCOUNT+=' ';
+ assert.equal(await session(request,env),false);
+});
+test('remember checkbox extends session to 30 days and stores username cookie',async()=>{
+ const env=await fixture();
+ const response=await login(req('username=owner&password=a-unique-long-password&remember=1'),env);
+ const joined=cookiesOf(response).join('\n');
+ assert.match(joined,/__Host-dashboard=[a-f0-9]{64};.*Max-Age=2592000/);
+ assert.match(joined,/dashboard-user=owner/);
+ const expires=env.sql.prepare('SELECT expires_at FROM dashboard_sessions').get().expires_at;
+ assert.ok(expires>Date.now()+20*86400000);
+});
 test('wrong credentials and cross-site submissions do not create sessions',async()=>{const env=await fixture();assert.equal((await login(req('username=owner&password=wrong'),env)).headers.get('location'),'/login?error=1');assert.equal((await login(req(undefined,'https://evil.example'),env)).status,403);assert.equal(env.sql.prepare('SELECT count(*) AS n FROM dashboard_sessions').get().n,0);});
 test('sixth login attempt is rate limited atomically',async()=>{const env=await fixture();for(let i=0;i<5;i++)await login(req('username=owner&password=wrong'),env);assert.equal((await login(req(),env)).status,429);});
 test('expired, forged and deleted sessions fail closed',async()=>{const env=await fixture();const response=await login(req(),env);const request=new Request('https://dashboard.nolsoopgames.com/',{headers:{cookie:response.headers.get('set-cookie')}});env.sql.exec('UPDATE dashboard_sessions SET expires_at=0');assert.equal(await session(request,env),false);env.sql.exec('DELETE FROM dashboard_sessions');assert.equal(await session(request,env),false);assert.equal(await session(new Request(request.url,{headers:{cookie:'__Host-dashboard='+randomToken()}}),env),false);});

@@ -33,7 +33,7 @@ export default function StoreLive({apps,app,days}:{apps:AppRecord[];app?:string;
   <div className="livegrid" aria-live="polite">
    {playTargets.map(a=>{const r=play[a.id];return <article className="livecard" key={'play-'+a.id}><h3>{a.name} · Play</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
     <div><dt>패키지</dt><dd>{r.data.packageName}</dd></div>
-    <div><dt>설치 (기간)</dt><dd>{r.data.installs==null?'배치 대기':r.data.installs.toLocaleString()}</dd></div>
+    <div><dt>설치 (기간)</dt><dd>{r.data.installs==null?<a href="/connections">배치 대기</a>:r.data.installs.toLocaleString()}</dd></div>
     <div><dt>삭제</dt><dd>{r.data.uninstalls==null?'—':r.data.uninstalls.toLocaleString()}</dd></div>
     <div><dt>평점</dt><dd>{r.data.ratings?`${r.data.ratings.average.toFixed(2)} (${r.data.ratings.count.toLocaleString()})`:'—'}</dd></div>
     <div><dt>스토어 방문</dt><dd>{r.data.perf?r.data.perf.visitors.toLocaleString():'—'}</dd></div>
@@ -54,7 +54,7 @@ export default function StoreLive({apps,app,days}:{apps:AppRecord[];app?:string;
    </>}</article>;})}
    {!playTargets.length&&!ascTargets.length&&<p className="note">스토어 ID(패키지·Apple App ID)가 등록된 앱이 없습니다.</p>}
   </div>
-  {!!([...playCharts,...ascCharts].length)&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>배치 데이터</span></div><TrendChart series={[...playCharts,...ascCharts]}/></div>}
+  {!!([...playCharts,...ascCharts].length)&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>스토어</span></div><TrendChart series={[...playCharts,...ascCharts]}/></div>}
   {detailPlay?.status==='success'&&!loading&&<>
    <DimTable title="Play 국가별 설치" rows={detailPlay.data.countries} metric="installs"/>
    <DimTable title="Play 앱 버전" rows={detailPlay.data.versions} metric="installs"/>

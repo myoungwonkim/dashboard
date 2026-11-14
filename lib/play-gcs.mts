@@ -220,6 +220,25 @@ export async function gcsDownloadBytes(bucket:string,objectName:string,token:str
  return await res.arrayBuffer();
 }
 
+/** Live-read install overview CSVs for a date window without waiting for D1 batch. */
+export async function fetchPlayInstallsLive(bucket:string,packageName:string,token:string,startYmd:string,endYmd:string,fetcher:typeof fetch=fetch){
+ const installs:InstallDay[]=[];const seen=new Set<string>();
+ for(const ym of yearMonthsAround()){
+  try{
+   const text=await gcsDownload(bucket,playStatsObjectName('installs',packageName,ym),token,fetcher);
+   if(!text)continue;
+   for(const row of parseInstallOverviewCsv(text,packageName)){
+    if(row.date<startYmd||row.date>endYmd||seen.has(row.date))continue;
+    seen.add(row.date);installs.push(row);
+   }
+  }catch{/* soft-fail per month */}
+ }
+ installs.sort((a,b)=>a.date.localeCompare(b.date));
+ const total=installs.reduce((s,r)=>s+r.installs,0);
+ const uninstalls=installs.reduce((s,r)=>s+r.uninstalls,0);
+ return {daily:installs,installs:total,uninstalls};
+}
+
 export async function fetchPlayCsvMetrics(bucket:string,packageName:string,token:string,fetcher:typeof fetch=fetch){
  const installs:InstallDay[]=[];const ratings:RatingDay[]=[];
  const countries:DimRow[]=[];const versions:DimRow[]=[];const traffic:DimRow[]=[];

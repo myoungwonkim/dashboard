@@ -3,7 +3,8 @@ import {getDb} from '@/db';
 import {playConnection} from '@/db/schema';
 import {envelopeConfig} from '@/lib/ga4-context';
 import {unseal} from '@/lib/admob-crypto.mjs';
-import {parsePlayQuery,playAccessToken,fetchPlayReport,validatePlayAccount,PlayError} from '@/lib/play-core.mts';
+import {parsePlayQuery,playAccessToken,fetchPlayReport,fetchPlayAcquisitionInstalls,validatePlayAccount,PlayError} from '@/lib/play-core.mts';
+import {fetchPlayInstallsLive} from '@/lib/play-gcs.mts';
 import {ensureSeedApps,getApp} from '@/lib/apps-store.mts';
 import {aggregateDims,loadStoreDims,loadStorePerf,loadStoreRange,summarizeStoreDays} from '@/lib/store-batch.mts';
 export const dynamic='force-dynamic';
@@ -39,15 +40,47 @@ export async function POST(req:Request){
    conversionRate:perfRows.length?perfRows.filter(r=>r.conversionRate!=null).slice(-1)[0]?.conversionRate??null:null,
    daily:perfRows.map(r=>({date:r.date,visitors:r.storeListingVisitors||0,acquisitions:r.storeListingAcquisitions||0,conversionRate:r.conversionRate})),
   };
+  let installs:number|null=hasBatch?summary.installs:null;
+  let uninstalls:number|null=hasBatch?summary.uninstalls:null;
+  let daily=summary.daily.map(d=>({date:d.date,installs:d.installs}));
+  let installsSource:string|null=hasBatch?'batch':null;
+  let note=hasBatch
+   ?'GCS 배치(설치·평점·국가/버전·스토어 성과) + 실시간 리뷰/바이탈'
+   :'설치·평점·분해 CSV는 GCS 버킷 연결 후 스토어 배치 실행 시 적재됩니다.';
+
+  if(!hasBatch){
+   const api=await fetchPlayAcquisitionInstalls(app.androidPkg,token,start,end);
+   if(api){
+    installs=api.installs;daily=api.daily;installsSource='reporting_api';
+    note='Reporting API 설치(실험) + 실시간 리뷰/바이탈. 국가·평점 분해는 스토어 배치가 필요합니다.';
+   }else if(account.gcsBucket){
+    try{
+     const live=await fetchPlayInstallsLive(account.gcsBucket,app.androidPkg,token,start,end);
+     if(live.daily.length){
+      installs=live.installs;uninstalls=live.uninstalls;daily=live.daily.map(d=>({date:d.date,installs:d.installs}));
+      installsSource='gcs_live';
+      note='GCS CSV 실시간 설치(배치 전). 국가·버전·평점 분해는 Connections에서 스토어 배치를 실행하세요.';
+     }else{
+      note='GCS 버킷은 연결됐지만 설치 CSV가 없거나 기간에 데이터가 없습니다. Play Console 다운로드 리포트·버킷 권한·스토어 배치를 확인하세요.';
+     }
+    }catch{
+     note='GCS 실시간 설치 조회에 실패했습니다. 버킷 이름·서비스 계정 권한(storage 읽기)을 확인하고 스토어 배치를 실행하세요.';
+    }
+   }else{
+    note='Play Reporting API는 설치 수를 제공하지 않습니다. Connections에서 GCS 리포트 버킷을 등록한 뒤 스토어 배치를 실행하세요.';
+   }
+  }
+
   return json({status:'success',data:{
    ...data,
-   installs:hasBatch?summary.installs:null,
-   uninstalls:hasBatch?summary.uninstalls:null,
+   installs,
+   uninstalls,
    ratings:summary.ratingAvg!=null?{average:summary.ratingAvg,count:summary.ratingCount||0}:null,
-   daily:summary.daily.map(d=>({date:d.date,installs:d.installs})),
-   spike:summary.spike,
+   daily,
+   spike:hasBatch?summary.spike:null,
    countries,versions,traffic,perf:perfRows.length?perf:null,
-   note:hasBatch?'GCS 배치(설치·평점·국가/버전·스토어 성과) + 실시간 리뷰/바이탈':'설치·평점·분해 CSV는 GCS 버킷 연결 후 배치 실행 시 적재됩니다.',
+   installsSource,
+   note,
   }});
  }catch(error){
   const code=error instanceof PlayError?error.code:(error instanceof Error?error.message:'provider_error');
