@@ -24,12 +24,13 @@ export async function POST(req:Request){
   const config=envelopeConfig();
   const account=validatePlayAccount(await unseal(JSON.parse(row.envelope),JSON.parse(config.privateKey),config.kid,'play'),row.gcsBucket);
   const token=await playAccessToken(account.client_email,account.private_key);
-  const data=await fetchPlayReport(app.androidPkg,token);
   const toYmd=(s?:string)=>{if(!s)return null;const n=s.replaceAll('-','');return /^\d{8}$/.test(n)?n:null;};
   // Prefer explicit picker range so Overview filters match Play installs.
   const end=toYmd(q.endDate)||ymd(new Date(Date.now()-86400000));
   const start=toYmd(q.startDate)||ymd(new Date(Date.now()-(q.days)*86400000));
+  // Load installs from D1/GCS first; reviews/vitals are soft-fail and must not block installs.
   const stored=await loadStoreRange(app.id,'play',start,end);
+  const data=await fetchPlayReport(app.androidPkg,token);
   const summary=summarizeStoreDays(stored);
   const hasBatch=stored.length>0;
   const countries=aggregateDims(await loadStoreDims(app.id,'play','country',start,end));
@@ -63,10 +64,12 @@ export async function POST(req:Request){
       installsSource='gcs_live';
       note='GCS CSV 실시간 설치(배치 전). 국가·버전·평점 분해는 Connections에서 스토어 배치를 실행하세요.';
      }else{
-      note='GCS 버킷은 연결됐지만 설치 CSV가 없거나 기간에 데이터가 없습니다. Play Console 다운로드 리포트·버킷 권한·스토어 배치를 확인하세요.';
+      note='GCS 버킷은 연결됐지만 설치 CSV가 없거나 기간에 데이터가 없습니다. 버킷 이름·CSV 경로·스토어 배치를 확인하세요.';
      }
-    }catch{
-     note='GCS 실시간 설치 조회에 실패했습니다. 버킷 이름·서비스 계정 권한(storage 읽기)을 확인하고 스토어 배치를 실행하세요.';
+    }catch(error){
+     // Auth/permission on the bucket should surface; other month-level misses are soft.
+     if(error instanceof PlayError&&(error.code==='permission_denied'||error.code==='authentication_failed'))throw error;
+     note='GCS 실시간 설치 조회에 실패했습니다. 버킷 이름·서비스 계정 권한을 확인하세요.';
     }
    }else{
     note='Play Reporting API는 설치 수를 제공하지 않습니다. Connections에서 GCS 리포트 버킷을 등록한 뒤 스토어 배치를 실행하세요.';

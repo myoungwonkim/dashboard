@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validatePlayAccount,parseInstallCsv,parseReviews,parseVitals,parsePlayQuery,parseAcquisitionInstalls} from '../lib/play-core.mts';
+import {validatePlayAccount,parseInstallCsv,parseReviews,parseVitals,parsePlayQuery,parseAcquisitionInstalls,fetchPlayReport} from '../lib/play-core.mts';
 
 test('Play account validation requires service account shape',()=>{
  assert.throws(()=>validatePlayAccount({type:'user'}));
@@ -38,6 +38,17 @@ test('play query keeps optional startDate and endDate',()=>{
  assert.equal(q.startDate,'2026-11-01');
  assert.equal(q.endDate,'2026-11-14');
  assert.equal(parsePlayQuery({app:'sudoku',days:7}).startDate,undefined);
+});
+
+test('fetchPlayReport soft-fails reviews 403 so installs path can continue',async()=>{
+ const fetcher=async(url)=>{
+  if(String(url).includes('/reviews'))return new Response('forbidden',{status:403});
+  if(String(url).includes('crashRateMetricSet'))return new Response('{}',{status:404});
+  return new Response('no',{status:500});
+ };
+ const report=await fetchPlayReport('com.nolsoopgames.bazi','token',fetcher);
+ assert.equal(report.reviews.length,0);
+ assert.match(report.note,/리뷰 API 권한/);
 });
 
 test('acquisition install parser sums daily metric rows',()=>{
