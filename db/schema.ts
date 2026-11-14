@@ -68,6 +68,27 @@ export const ascReportRequests=sqliteTable('asc_report_requests',{
  lastCheckedAt:text('last_checked_at'),
  status:text('status'),
 });
+export const marketingAccounts=sqliteTable('marketing_accounts',{
+ id:text('id').primaryKey(),
+ platform:text('platform').notNull(),
+ label:text('label').notNull(),
+ appId:text('app_id').notNull(),
+ externalId:text('external_id').notNull(),
+ envelope:text('envelope').notNull(),
+ createdAt:text('created_at').notNull(),
+ verifiedAt:text('verified_at'),
+ lastSyncAt:text('last_sync_at'),
+ lastError:text('last_error'),
+});
+export const marketingDaily=sqliteTable('marketing_daily',{
+ appId:text('app_id').notNull(),
+ source:text('source').notNull(),
+ date:text('date').notNull(),
+ spend:real('spend').notNull(),
+ currency:text('currency').notNull().default('USD'),
+ note:text('note'),
+ updatedAt:text('updated_at').notNull(),
+},(t)=>({pk:primaryKey({columns:[t.appId,t.source,t.date]})}));
 export const apps=sqliteTable('apps',{
  id:text('id').primaryKey(),
  name:text('name').notNull(),

@@ -24,6 +24,7 @@
 
 @media(max-width:420px){.pagepicker-trigger{max-width:min(220px,62vw);font-size:12px}}
 
+.marketing-csv{width:100%;max-width:720px;box-sizing:border-box;font:inherit;font-size:12px;line-height:1.45;padding:12px;border:1px solid #ddd;border-radius:8px;resize:vertical;min-height:120px}
 .noticefold{margin:0 0 4px}
 .noticefold-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;border:1px solid #eeeee9;background:#f6f6f4;color:#74746e;border-radius:6px;padding:10px 14px;font:inherit;font-size:12px;cursor:pointer}
 .noticefold-toggle:hover{background:#f0f0ed;color:#555}
@@ -72,8 +73,11 @@
 .charttype button+button{border-left:1px solid #e2e2df}
 .batchwait{color:#888;font-size:12px}
 .batchwait a{text-decoration:underline;color:#555}
-.overviewkpi{margin:8px 0 28px}
+.overviewkpi{margin:8px 0 28px;grid-template-columns:repeat(3,1fr);gap:18px 0}
+.overviewkpi .metric{border-right:1px solid #e8e8e8;padding:0 18px 16px}
+.overviewkpi .metric:nth-child(3n){border-right:0}
 .overviewkpi .metric small{display:block;margin-top:6px;color:#999;font-size:11px}
+@media(max-width:720px){.overviewkpi{grid-template-columns:repeat(2,1fr)}.overviewkpi .metric{border:0;padding:0 0 16px}.overviewkpi .metric:nth-child(3n){border:0}}
 .viewmode{display:inline-flex;gap:4px;border:1px solid #e5e5e0;border-radius:8px;padding:3px;background:#fafafa}
 .viewmode button{border:0;background:transparent;padding:6px 12px;border-radius:6px;font:inherit;font-size:12px;color:#777;cursor:pointer}
 .viewmode button.selected{background:#fff;color:#242424;font-weight:600;box-shadow:0 0 0 1px #e5e5e0}
