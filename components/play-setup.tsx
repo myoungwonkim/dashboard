@@ -36,18 +36,18 @@ export default function PlaySetup(){
   <div className="playstep">3 배치</div>
  </div>
  <ol>
-  <li><strong>서비스 계정 초대</strong>: Play Console → <strong>사용자 및 권한</strong> → 사용자 초대. 서비스 계정 이메일을 넣고 권한은 최소한 <strong>앱 정보 보기(전체)</strong> (설치 통계 CSV). 재무 리포트까지 쓰려면 <strong>재무 데이터 보기</strong>도 켭니다.</li>
-  <li><strong>GCS 버킷 이름 복사</strong> (최신 UI):
+  <li><strong>서비스 계정 초대</strong>: Play Console → <strong>사용자 및 권한</strong> → 사용자 초대. 서비스 계정 이메일을 넣고 권한은 최소한 <strong>앱 정보 보기(전체)</strong>. 재무까지면 <strong>재무 데이터 보기</strong>도 켭니다.</li>
+  <li><strong>GCS 버킷 이름 복사</strong> — <em>앱 안 「통계」 화면이 아닙니다.</em>
+   <p className="note">지금 보신 <strong>통계 → 앱 통계 → 보고서 내보내기</strong>는 화면용 내보내기이고, 대시보드가 쓰는 <code>pubsite_prod_rev_…</code> 버킷 URI가 아닙니다.</p>
    <ol className="nested">
-    <li>왼쪽 메뉴 하단 <strong>계정 관리</strong>(또는 톱니/계정 영역) → <strong>Google Play 앱 보고서</strong></li>
-    <li><strong>통계</strong> 탭을 엽니다. (리뷰·재무 탭도 같은 버킷입니다)</li>
-    <li>섹션 제목 옆 <strong>Cloud Storage URI 복사</strong>를 누릅니다.</li>
-    <li>붙여넣기 예: <code>gs://pubsite_prod_rev_0123456789/stats/…</code> → 여기 입력칸에는 <strong>버킷 이름만</strong> 넣습니다: <code>pubsite_prod_rev_0123456789</code> (<code>gs://</code>·슬래시 이후 경로 제외)</li>
+    <li>왼쪽 맨 위 <strong>집(홈)</strong>을 눌러 특정 앱 화면에서 나갑니다. (모든 앱 / 개발자 계정 홈)</li>
+    <li>왼쪽 메뉴를 <strong>아래로 끝까지</strong> 내리거나, 계정/설정 쪽에서 <strong>다운로드 보고서</strong> 또는 <strong>계정 관리 → Google Play 앱 보고서</strong>를 엽니다.</li>
+    <li>그중 <strong>통계</strong>(Statistics)를 선택합니다. 페이지 제목 근처에 <strong>Cloud Storage URI 복사</strong> 버튼이 있습니다.</li>
+    <li>복사된 값 예: <code>gs://pubsite_prod_rev_0123456789/stats/…</code> → 아래 칸에는 <strong>가운데 버킷 이름만</strong>: <code>pubsite_prod_rev_0123456789</code></li>
    </ol>
-   <p className="note">예전 메뉴명 「다운로드 보고서」는 최신 Console에서 <strong>계정 관리 → Google Play 앱 보고서</strong>로 옮겨졌습니다. 앱별 통계 화면이 아닙니다.</p>
   </li>
-  <li>서비스 계정 JSON 키를 아래에서 등록합니다. (키가 Play에 초대되어 있어야 GCS도 읽힙니다)</li>
-  <li>아래 <strong>스토어 배치</strong>를 한 번 실행합니다. (매일 UTC 21:00 ≈ KST 06:00 cron) 버킷만 있어도 Overview는 CSV를 실시간으로 합산할 수 있습니다.</li>
+  <li>서비스 계정 JSON 키를 아래에서 등록합니다.</li>
+  <li>아래 <strong>스토어 배치</strong>를 한 번 실행합니다. (매일 UTC 21:00 ≈ KST 06:00)</li>
  </ol>
  <div className="setupactions">
   <label className="filelabel">서비스 계정 JSON<input ref={input} type="file" accept=".json,application/json" disabled={!setup||busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label>
