@@ -19,10 +19,25 @@ export type RetentionSummary={d1:number|null;d7:number|null;d14:number|null;d30:
 export type RetentionRow={cohort:string;users:number;rates:Record<number,number|null>};
 export type RetentionData={summary:RetentionSummary;rows:RetentionRow[];offsets:number[]};
 
-function avgAt(rows:RetentionRow[],day:number){
- const vals=rows.map(r=>r.rates[day]).filter((v):v is number=>v!=null&&Number.isFinite(v));
- if(!vals.length)return null;
- return vals.reduce((s,v)=>s+v,0)/vals.length;
+/** Cohort-size weighted mean retention at nth day; falls back to unweighted if sizes missing. */
+export function weightedRateAt(rows:RetentionRow[],day:number){
+ let num=0,den=0,fallback=0,n=0;
+ for(const r of rows){
+  const v=r.rates[day];
+  if(v==null||!Number.isFinite(v))continue;
+  const w=r.users||0;
+  if(w>0){num+=v*w;den+=w;}
+  else{fallback+=v;n++;}
+ }
+ if(den>0)return num/den;
+ if(n>0)return fallback/n;
+ return null;
+}
+export function retentionTotals(rows:RetentionRow[],offsets:number[]){
+ const users=rows.reduce((s,r)=>s+(r.users||0),0);
+ const rates:Record<number,number|null>={};
+ for(const d of offsets)rates[d]=weightedRateAt(rows,d);
+ return {users,rates};
 }
 
 function dimensionFilter(q:Query,includeAudienceFilters:boolean){
@@ -106,7 +121,7 @@ export function parseCohortReport(body:unknown):RetentionData|null{
  return {
   rows,
   offsets,
-  summary:{d1:avgAt(rows,1),d7:avgAt(rows,7),d14:avgAt(rows,14),d30:avgAt(rows,30),cohorts:rows.length,endOffset:maxOffset},
+  summary:{d1:weightedRateAt(rows,1),d7:weightedRateAt(rows,7),d14:weightedRateAt(rows,14),d30:weightedRateAt(rows,30),cohorts:rows.length,endOffset:maxOffset},
  };
 }
 

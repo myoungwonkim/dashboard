@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cohortAbsoluteRange,cohortReportBody,eachDayInclusive,parseCohortReport} from '../lib/ga4-cohort.mts';
+import {cohortAbsoluteRange,cohortReportBody,eachDayInclusive,parseCohortReport,retentionTotals,weightedRateAt} from '../lib/ga4-cohort.mts';
 
 test('cohort absolute range uses picker dates when present',()=>{
  assert.deepEqual(cohortAbsoluteRange({app:'bazi',days:7,startDate:'2024-01-01',endDate:'2024-01-07',country:'all',os:'all'}),{startDate:'2024-01-01',endDate:'2024-01-07'});
@@ -34,7 +34,13 @@ test('parseCohortReport builds matrix and averages',()=>{
  });
  assert.equal(data.rows.length,2);
  assert.equal(data.rows[0].users,100);
- assert.equal(data.summary.d1,0.45);
+ // Weighted by cohort size: (0.4*100 + 0.5*50) / 150
+ assert.equal(data.summary.d1,65/150);
  assert.equal(data.summary.d7,0.2);
  assert.equal(data.summary.d30,null);
+ const totals=retentionTotals(data.rows,[0,1,7]);
+ assert.equal(totals.users,150);
+ assert.equal(totals.rates[0],1);
+ assert.equal(totals.rates[1],65/150);
+ assert.equal(weightedRateAt(data.rows,7),0.2);
 });

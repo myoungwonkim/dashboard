@@ -123,6 +123,7 @@
 .retentionwrap{overflow-x:auto;max-width:100%}
 .retention th,.retention td{text-align:right;font-variant-numeric:tabular-nums;font-size:12px;padding:6px 8px}
 .retention th:first-child,.retention td:first-child,.retention th:nth-child(2),.retention td:nth-child(2){text-align:left}
+.retention tr.retention-total td{font-weight:600;background:#f3f3f0;border-bottom:1px solid #ddd}
 /* Dense / readable tables — prefer wrapping labels over ultra-wide nowrap sprawl */
 table.dense{white-space:normal}
 table.dense th,table.dense td{padding:8px 10px;font-size:12px;vertical-align:top}
