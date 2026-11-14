@@ -1,11 +1,9 @@
 'use client';
 import {useEffect,useId,useRef,useState} from 'react';
-import Link from '@/client/navigation';
 import {useRouter} from '@/client/navigation';
 import {ChevronDown} from 'lucide-react';
 import type {AppRecord} from '@/lib/apps';
 import {appColor} from '@/lib/app-colors';
-import AppIcon from './app-icon';
 
 function hrefFor(id:string){
  if(id==='overview')return '/';
@@ -55,29 +53,4 @@ export default function PagePicker({page,apps,progressLabel}:{page:string;apps:A
    </div>
   </div>}
  </div>;
-}
-
-export function WorkspaceNav({page,apps,progressLabel}:{page:string;apps:AppRecord[];progressLabel:string}){
- const current=apps.find(a=>a.id===page);
- const value=page==='overview'||page==='progress'||page==='connections'?page:(current?page:'overview');
- return <nav className="workspacenav" aria-label="워크스페이스 페이지">
-  <div className="workspacenav-group">
-   <span className="workspacenav-label">현황</span>
-   <Link href="/" className={value==='overview'?'selected':undefined}>서비스 현황</Link>
-  </div>
-  <div className="workspacenav-group workspacenav-apps">
-   <span className="workspacenav-label">앱</span>
-   {!apps.length&&<span className="workspacenav-empty">등록된 앱 없음</span>}
-   <div className="workspacenav-applist">
-    {apps.map(a=><Link key={a.id} href={`/apps/${a.id}`} className={'workspacenav-app'+(value===a.id?' selected':'')} title={a.androidPkg||a.id}>
-     <AppIcon app={a} size={32}/><span><strong><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}</strong><small>{a.androidPkg||a.id}</small></span>
-    </Link>)}
-   </div>
-  </div>
-  <div className="workspacenav-group">
-   <span className="workspacenav-label">관리</span>
-   <Link href="/progress" className={value==='progress'?'selected':undefined}>{progressLabel}</Link>
-   <Link href="/connections" className={value==='connections'?'selected':undefined}>데이터 연결</Link>
-  </div>
- </nav>;
 }

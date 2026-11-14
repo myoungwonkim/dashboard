@@ -17,7 +17,7 @@ import PlaySetup from './play-setup';
 import AscSetup from './asc-setup';
 import StoreLive from './store-live';
 import StoreBatchPanel from './store-batch-panel';
-import PagePicker,{WorkspaceNav} from './page-picker';
+import PagePicker from './page-picker';
 import {admobPublisherId} from '@/lib/admob-config';
 import {adArpu,fmtUsd} from '@/lib/arpu.mts';
 const tasks=[
@@ -239,5 +239,5 @@ export default function Dashboard({page}:{page:string}){
  ].map(([name,first,second])=><section className="connection" key={name}><div className="sectiontitle"><h2>{name}</h2><span className="status">안내</span></div><p>{first}</p><p>{second}</p></section>)}</div>
  <section className="projectids"><h2>AdMob 게시자</h2><p className="note">게시자 ID: {admobPublisherId} · 앱별 ca-app-pub ID는 앱 행에 저장</p></section>
  </>}
- <WorkspaceNav page={page} apps={apps} progressLabel={progressLabel}/></main></div></div>;
+ <nav className="utilitylinks" aria-label="대시보드 관리"><Link href="/">서비스 현황</Link><Link href="/progress">{progressLabel}</Link><Link href="/connections">데이터 연결</Link></nav></main></div></div>;
 }
