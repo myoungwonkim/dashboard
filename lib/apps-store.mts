@@ -3,12 +3,14 @@ import {apps} from '@/db/schema';
 import {asc,eq} from 'drizzle-orm';
 import type {AppInput,AppRecord,AppStatus} from './apps.ts';
 import {seedApps} from './apps.ts';
+import {resolveStoreIconUrl} from './store-icons.mts';
 
 function mapRow(row:{
  id:string;name:string;symbol:string;status:string;
  firebaseProjectId:string|null;ga4PropertyId:string|null;androidPkg:string|null;
  iosBundleId:string|null;appleAppId:string|null;admobAndroidAppId:string|null;
  admobIosAppId:string|null;afAndroidId:string|null;afIosId:string|null;
+ iconUrl?:string|null;iconSource?:string|null;iconFetchedAt?:string|null;
  checks:string|null;checkedAt:string|null;createdAt:string;updatedAt:string;
 }):AppRecord{
  let checks:unknown=null;
@@ -18,6 +20,7 @@ function mapRow(row:{
   firebaseProjectId:row.firebaseProjectId,ga4PropertyId:row.ga4PropertyId,androidPkg:row.androidPkg,
   iosBundleId:row.iosBundleId,appleAppId:row.appleAppId,admobAndroidAppId:row.admobAndroidAppId,
   admobIosAppId:row.admobIosAppId,afAndroidId:row.afAndroidId,afIosId:row.afIosId,
+  iconUrl:row.iconUrl??null,iconSource:row.iconSource??null,iconFetchedAt:row.iconFetchedAt??null,
   checks,checkedAt:row.checkedAt,createdAt:row.createdAt,updatedAt:row.updatedAt,
  };
 }
@@ -74,6 +77,32 @@ export async function updateApp(id:string,patch:Partial<AppInput>):Promise<AppRe
 
 export async function setAppChecks(id:string,checks:unknown):Promise<void>{
  await getDb().update(apps).set({checks:JSON.stringify(checks),checkedAt:new Date().toISOString(),updatedAt:new Date().toISOString()}).where(eq(apps.id,id));
+}
+
+const ICON_TTL_MS=7*86400000;
+function iconStale(fetchedAt:string|null|undefined){
+ if(!fetchedAt)return true;
+ const ms=Date.parse(fetchedAt);
+ return !Number.isFinite(ms)||Date.now()-ms>ICON_TTL_MS;
+}
+
+export async function setAppIcon(id:string,iconUrl:string|null,iconSource:string|null){
+ const now=new Date().toISOString();
+ await getDb().update(apps).set({iconUrl,iconSource,iconFetchedAt:now,updatedAt:now}).where(eq(apps.id,id));
+}
+
+/** Refresh Play/iTunes icons for apps missing a fresh iconUrl. */
+export async function refreshAppIcons(list:AppRecord[],{force=false,fetcher=fetch}:{force?:boolean;fetcher?:typeof fetch}={}){
+ const targets=list.filter(a=>(a.androidPkg||a.appleAppId)&&(force||!a.iconUrl||iconStale(a.iconFetchedAt)));
+ const updated:AppRecord[]=[];
+ for(const app of targets){
+  const resolved=await resolveStoreIconUrl({androidPkg:app.androidPkg,appleAppId:app.appleAppId},fetcher);
+  if(!resolved)continue;
+  await setAppIcon(app.id,resolved.url,resolved.source);
+  const next=await getApp(app.id);
+  if(next)updated.push(next);
+ }
+ return updated;
 }
 
 export async function ensureSeedApps():Promise<void>{

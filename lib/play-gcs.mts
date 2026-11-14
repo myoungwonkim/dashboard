@@ -204,12 +204,33 @@ export function yearMonthsAround(now=new Date(),count=3){
  return out;
 }
 
-export async function gcsDownload(bucket:string,objectName:string,token:string,fetcher:typeof fetch=fetch){
- const url=`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(objectName)}?alt=media`;
- const res=await fetcher(url,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30000)});
- if(res.status===404)return null;
- if(!res.ok)throw new PlayError(res.status===403?'permission_denied':res.status===401?'authentication_failed':'provider_error',res.status===429?429:502);
- return await res.text();
+/** Inclusive YYYYMM list for a YYYYMMDD window, plus one prior month for export lag. */
+export function yearMonthsForRange(startYmd:string,endYmd:string){
+ if(!/^\d{8}$/.test(startYmd)||!/^\d{8}$/.test(endYmd))return yearMonthsAround();
+ const start=new Date(Date.UTC(+startYmd.slice(0,4),+startYmd.slice(4,6)-1,1));
+ start.setUTCMonth(start.getUTCMonth()-1);
+ const end=new Date(Date.UTC(+endYmd.slice(0,4),+endYmd.slice(4,6)-1,1));
+ const out:string[]=[];
+ for(let d=new Date(end);d>=start;d.setUTCMonth(d.getUTCMonth()-1)){
+  out.push(`${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}`);
+ }
+ return out;
+}
+
+function isHardPlayError(error:unknown){
+ return error instanceof PlayError&&(error.code==='permission_denied'||error.code==='authentication_failed');
+}
+
+/** Play Console GCS reports are often gzip + UTF-16LE; never decode as plain UTF-8 text. */
+export async function decodePlayCsvBytes(buf:ArrayBuffer){
+ let bytes=new Uint8Array(buf);
+ if(bytes.length>=2&&bytes[0]===0x1f&&bytes[1]===0x8b){
+  const stream=new Response(buf).body?.pipeThrough(new DecompressionStream('gzip'));
+  if(!stream)throw new PlayError('invalid_response');
+  buf=await new Response(stream).arrayBuffer();
+  bytes=new Uint8Array(buf);
+ }
+ return decodeMaybeUtf16(buf);
 }
 
 export async function gcsDownloadBytes(bucket:string,objectName:string,token:string,fetcher:typeof fetch=fetch){
@@ -220,10 +241,16 @@ export async function gcsDownloadBytes(bucket:string,objectName:string,token:str
  return await res.arrayBuffer();
 }
 
+export async function gcsDownload(bucket:string,objectName:string,token:string,fetcher:typeof fetch=fetch){
+ const bytes=await gcsDownloadBytes(bucket,objectName,token,fetcher);
+ if(!bytes)return null;
+ return decodePlayCsvBytes(bytes);
+}
+
 /** Live-read install overview CSVs for a date window without waiting for D1 batch. */
 export async function fetchPlayInstallsLive(bucket:string,packageName:string,token:string,startYmd:string,endYmd:string,fetcher:typeof fetch=fetch){
  const installs:InstallDay[]=[];const seen=new Set<string>();
- for(const ym of yearMonthsAround()){
+ for(const ym of yearMonthsForRange(startYmd,endYmd)){
   try{
    const text=await gcsDownload(bucket,playStatsObjectName('installs',packageName,ym),token,fetcher);
    if(!text)continue;
@@ -231,7 +258,10 @@ export async function fetchPlayInstallsLive(bucket:string,packageName:string,tok
     if(row.date<startYmd||row.date>endYmd||seen.has(row.date))continue;
     seen.add(row.date);installs.push(row);
    }
-  }catch{/* soft-fail per month */}
+  }catch(error){
+   if(isHardPlayError(error))throw error;
+   // Missing/corrupt month files soft-fail; auth errors surface.
+  }
  }
  installs.sort((a,b)=>a.date.localeCompare(b.date));
  const total=installs.reduce((s,r)=>s+r.installs,0);
@@ -244,8 +274,11 @@ export async function fetchPlayCsvMetrics(bucket:string,packageName:string,token
  const countries:DimRow[]=[];const versions:DimRow[]=[];const traffic:DimRow[]=[];
  const perf:PerfDay[]=[];const reviewHistory:{date:string;rating:number;title:string;text:string;author:string;replied:boolean}[]=[];
  const seenInstall=new Set<string>(),seenRating=new Set<string>(),seenPerf=new Set<string>();
- for(const ym of yearMonthsAround()){
-  const tryText=async(objectName:string)=>{try{return await gcsDownload(bucket,objectName,token,fetcher);}catch{return null;}};
+ const tryText=async(objectName:string)=>{
+  try{return await gcsDownload(bucket,objectName,token,fetcher);}
+  catch(error){if(isHardPlayError(error))throw error;return null;}
+ };
+ for(const ym of yearMonthsAround(new Date(),4)){
   const installText=await tryText(playStatsObjectName('installs',packageName,ym));
   if(installText){for(const row of parseInstallOverviewCsv(installText,packageName)){if(!seenInstall.has(row.date)){seenInstall.add(row.date);installs.push(row);}}}
   const ratingText=await tryText(playStatsObjectName('ratings',packageName,ym));
@@ -260,8 +293,8 @@ export async function fetchPlayCsvMetrics(bucket:string,packageName:string,token
   if(trafficText){try{traffic.push(...parseDimCsv(trafficText,packageName,/traffic source/i));}catch{/* skip */}}
   try{
    const bytes=await gcsDownloadBytes(bucket,playReviewsObjectName(packageName,ym),token,fetcher);
-   if(bytes)reviewHistory.push(...parseReviewsHistoryCsv(decodeMaybeUtf16(bytes),packageName));
-  }catch{/* skip */}
+   if(bytes)reviewHistory.push(...parseReviewsHistoryCsv(await decodePlayCsvBytes(bytes),packageName));
+  }catch(error){if(isHardPlayError(error))throw error;}
  }
  installs.sort((a,b)=>a.date.localeCompare(b.date));
  ratings.sort((a,b)=>a.date.localeCompare(b.date));
