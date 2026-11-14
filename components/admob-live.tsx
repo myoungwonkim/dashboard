@@ -2,8 +2,9 @@ import {useEffect,useState} from 'react';
 import type {AppRecord} from '@/lib/apps';
 import {appColor} from '@/lib/app-colors';
 import {adArpu,adArpdau,fmtUsd} from '@/lib/arpu.mts';
+import {formatLabel} from '@/lib/admob-core.mts';
 import TrendChart from './trend-chart';
-type AdUnitRow={adUnitId:string;name:string;format:string;revenue:number;impressions:number;clicks:number;ecpm:number;ctr:number;adRequests:number;matchedRequests:number};
+type AdUnitRow={adUnitId:string;name:string;format:string;formatLabel?:string;revenue:number;impressions:number;clicks:number;ecpm:number;ctr:number;adRequests:number;matchedRequests:number};
 type Data={
  revenue:number;impressions:number;clicks:number;ecpm:number;ctr?:number;currency:string;timeZone:string;fetchedAt:string;limited:boolean;
  adRequests?:number;matchedRequests?:number;matchRate?:number;showRate?:number;
@@ -59,12 +60,12 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os}:{
   const formats=r.data.formats||[];
   if(!units.length&&!formats.length&&!(app&&r.data.countries?.length))return null;
   return <div key={a.id+'-break'} style={{marginTop:20}}>
-   {!!units.length&&<div className="panel"><div className="sectiontitle"><h2>광고 유닛별 수익</h2><span>{a.name} · 유저당=유닛수익÷GA4활성</span></div>
-    <p className="note">같은 기간 GA4 활성 사용자({active!=null?active.toLocaleString():'—'}명)로 나눈 기여 ARPU입니다. 유닛 합 = 앱 ARPU.</p>
-    <div className="tablewrap"><table><thead><tr><th>유닛</th><th>포맷</th><th>수익</th><th>유저당</th><th>노출</th><th>eCPM</th><th>CTR</th></tr></thead>
-    <tbody>{units.map(u=><tr key={u.adUnitId+'/'+u.format}><td><strong>{u.name}</strong><small style={{display:'block',color:'#999',fontSize:11}}>{u.adUnitId}</small></td><td>{u.format}</td><td>${u.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(u.revenue,active))}</td><td>{u.impressions.toLocaleString()}</td><td>${u.ecpm.toFixed(2)}</td><td>{(u.ctr*100).toFixed(2)}%</td></tr>)}</tbody></table></div>
+   {!!units.length&&<div className="panel"><div className="sectiontitle"><h2>광고 유닛별 수익</h2><span>{a.name} · 이름 · 타입</span></div>
+    <p className="note">표시 이름·타입(포맷) 기준입니다. 유저당 = 유닛 수익 ÷ GA4 기간 활성({active!=null?active.toLocaleString():'—'}명).</p>
+    <div className="tablewrap"><table><thead><tr><th>이름</th><th>타입</th><th>수익</th><th>유저당</th><th>노출</th><th>eCPM</th><th>CTR</th></tr></thead>
+    <tbody>{units.map(u=><tr key={u.adUnitId+'/'+u.format} title={u.adUnitId}><td>{u.name===u.adUnitId?<span style={{color:'#888'}}>이름 없음</span>:<strong>{u.name}</strong>}</td><td>{u.formatLabel||u.format}</td><td>${u.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(u.revenue,active))}</td><td>{u.impressions.toLocaleString()}</td><td>${u.ecpm.toFixed(2)}</td><td>{(u.ctr*100).toFixed(2)}%</td></tr>)}</tbody></table></div>
    </div>}
-   {!!formats.length&&(app||targets.length===1)&&<div className="panel" style={{marginTop:units.length?16:0}}><div className="sectiontitle"><h2>광고 포맷</h2><span>{a.name} · 수익 · 유저당</span></div><div className="tablewrap"><table><thead><tr><th>포맷</th><th>수익</th><th>유저당</th><th>노출</th><th>요청</th><th>매칭</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{formats.map(f=><tr key={f.format}><td>{f.format}</td><td>${f.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(f.revenue,active))}</td><td>{f.impressions.toLocaleString()}</td><td>{f.adRequests.toLocaleString()}</td><td>{f.matchedRequests.toLocaleString()}</td><td>${f.ecpm.toFixed(2)}</td><td>{(f.ctr*100).toFixed(2)}%</td></tr>)}</tbody></table></div></div>}
+   {!!formats.length&&(app||targets.length===1)&&<div className="panel" style={{marginTop:units.length?16:0}}><div className="sectiontitle"><h2>광고 타입(포맷)</h2><span>{a.name} · 수익 · 유저당</span></div><div className="tablewrap"><table><thead><tr><th>타입</th><th>수익</th><th>유저당</th><th>노출</th><th>요청</th><th>매칭</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{formats.map(f=><tr key={f.format}><td>{formatLabel(f.format)}</td><td>${f.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(f.revenue,active))}</td><td>{f.impressions.toLocaleString()}</td><td>{f.adRequests.toLocaleString()}</td><td>{f.matchedRequests.toLocaleString()}</td><td>${f.ecpm.toFixed(2)}</td><td>{(f.ctr*100).toFixed(2)}%</td></tr>)}</tbody></table></div></div>}
    {app&&!!r.data.countries?.length&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>국가별 수익</h2><span>AdMob</span></div><div className="tablewrap"><table><thead><tr><th>국가</th><th>수익</th><th>유저당</th><th>노출</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{r.data.countries.map(c=><tr key={c.country}><td>{c.country}</td><td>${c.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(c.revenue,active))}</td><td>{c.impressions.toLocaleString()}</td><td>${c.ecpm.toFixed(2)}</td><td>{(c.ctr*100).toFixed(2)}%</td></tr>)}</tbody></table></div></div>}
   </div>;
  })}
