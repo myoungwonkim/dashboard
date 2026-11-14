@@ -41,6 +41,8 @@
 .playstep.done{border-color:#cfcfc9;background:#f4f4f2;color:#333;font-weight:600}
 .appdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle;flex-shrink:0}
 .appicon.img{object-fit:cover;border-radius:8px;background:#f4f4f2;display:block;flex-shrink:0}
+.ga4setup ol.nested{margin:8px 0 4px;padding-left:18px;color:#555;font-size:13px;line-height:1.65}
+.ga4setup ol.nested li{margin:4px 0}
 .livecard h3{display:flex;align-items:center;gap:0}
 .chartcontrols{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
 .appslist{display:grid;gap:12px;margin:8px 0 28px}
