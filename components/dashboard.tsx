@@ -3,7 +3,7 @@ import {presetRange,validateRange} from '@/lib/date-range.mts';
 import {useEffect,useMemo,useState} from 'react';
 import Link from '@/client/navigation';
 import {useRouter} from '@/client/navigation';
-import {ArrowUpRight,Check,ChevronRight} from 'lucide-react';
+import {ArrowUpRight,Check,ChevronRight,RefreshCw} from 'lucide-react';
 import {appBadges,type AppRecord} from '@/lib/apps';
 import GA4Live from './ga4-live';
 import GA4Setup from './ga4-setup';
@@ -96,8 +96,14 @@ export default function Dashboard({page}:{page:string}){
   return <div className="shell"><div className="workspace"><main><h1>앱을 찾을 수 없습니다</h1><p className="subtitle">등록되지 않았거나 보관된 앱입니다.</p><p className="note"><Link href="/connections">데이터 연결에서 앱 확인</Link></p></main></div></div>;
  }
 
+ const [refreshing,setRefreshing]=useState(false);
+ function refreshPage(){
+  setRefreshing(true);
+  // Soft reload keeps the same route and re-fetches all live sections.
+  window.location.reload();
+ }
  return <div className="shell">
- <div className="workspace"><header><div>워크스페이스 <ChevronRight size={13}/><select className="pagepicker" aria-label="페이지 및 앱 선택" value={page==='overview'||page==='progress'||page==='connections'?page:(current?page:'overview')} onChange={e=>{const v=e.target.value;router.push(v==='overview'?'/':v==='progress'?'/progress':v==='connections'?'/connections':`/apps/${v}`);}}>{pageOptions.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'운영하는 앱의 유입, 활동, 수익을 한눈에.':page==='progress'?'P0–P3 코드는 배포됨. 남은 항목은 계정 연결과 수치 대조입니다.':'계정 연결과 앱 식별자를 등록합니다.'}</p></div>{page==='connections'&&!showForm&&!editing&&<button type="button" className="setupbutton" onClick={()=>{setEditing(null);setShowForm(true);}}>앱 추가</button>}</div>
+ <div className="workspace"><header><div>워크스페이스 <ChevronRight size={13}/><select className="pagepicker" aria-label="페이지 및 앱 선택" value={page==='overview'||page==='progress'||page==='connections'?page:(current?page:'overview')} onChange={e=>{const v=e.target.value;router.push(v==='overview'?'/':v==='progress'?'/progress':v==='connections'?'/connections':`/apps/${v}`);}}>{pageOptions.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div><div className="headeractions"><button type="button" className="refresh" disabled={refreshing} onClick={refreshPage} aria-label="페이지 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'운영하는 앱의 유입, 활동, 수익을 한눈에.':page==='progress'?'P0–P3 코드는 배포됨. 남은 항목은 계정 연결과 수치 대조입니다.':'계정 연결과 앱 식별자를 등록합니다.'}</p></div><div className="titleactions">{report&&<button type="button" className="refresh" disabled={refreshing} onClick={refreshPage}><RefreshCw size={14}/> 데이터 새로고침</button>}{page==='connections'&&!showForm&&!editing&&<button type="button" className="setupbutton" onClick={()=>{setEditing(null);setShowForm(true);}}>앱 추가</button>}</div></div>
  {appsError&&<div className="notice" role="status"><span className="dot"/>{appsError}<button type="button" className="refresh" onClick={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}>다시 시도</button></div>}
  {report&&<><div className="notice"><span className="dot"/>GA4·AdMob·스토어 실제 보고서를 조회합니다. AppsFlyer 무료(Zero)는 API 미연동입니다.<Link href="/connections">연결 안내 <ArrowUpRight size={13}/></Link></div>
  {page==='overview'&&needsSetup&&appsLoaded&&!appsError&&<div className="notice setuphint"><span className="dot"/>수치가 — 이면 미연결·조회 실패·배치 전일 수 있습니다. (iOS/ASC는 출시 전이면 생략 가능)<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
