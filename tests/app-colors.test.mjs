@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {appColor} from '../lib/app-colors.ts';
 
 test('known apps keep fixed distinct colors',()=>{
- assert.equal(appColor('bazi'),'#2F6B4F');
- assert.equal(appColor('sudoku'),'#3B5BDB');
+ assert.equal(appColor('bazi'),'#C2410C');
+ assert.equal(appColor('sudoku'),'#1D4ED8');
  assert.notEqual(appColor('bazi'),appColor('sudoku'));
 });
 

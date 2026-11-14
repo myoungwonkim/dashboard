@@ -1,9 +1,9 @@
-/** Stable per-app chart/UI colors. Keep muted so the grayscale shell stays calm. */
+/** Stable per-app chart/UI colors. Warm vs cool pair so series stay easy to tell apart. */
 const KNOWN:Record<string,string>={
- bazi:'#2F6B4F',
- sudoku:'#3B5BDB',
+ bazi:'#C2410C',   // amber-orange — distinct from sudoku blue
+ sudoku:'#1D4ED8', // strong blue
 };
-const FALLBACK=['#B45309','#7C3AED','#0F766E','#BE123C','#475569','#A16207'];
+const FALLBACK=['#0F766E','#7C3AED','#BE123C','#475569','#A16207','#2F6B4F'];
 
 export function appColor(appId:string):string{
  if(KNOWN[appId])return KNOWN[appId];
