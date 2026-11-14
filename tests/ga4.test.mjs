@@ -56,17 +56,48 @@ test('deep batch failure falls back to core totals and daily',async()=>{
  let deepTried=false;
  const result=await fetchReport(query,'tok',async(_url,options)=>{
   const body=JSON.parse(options.body);
+  if(body.requests.length===1)return new Response('nope',{status:500});
   if(body.requests.length===5){deepTried=true;return new Response('nope',{status:500});}
-  if(body.requests.length===2)return Response.json(coreOnly);
+  if(body.requests[0].metrics.length===8)return Response.json(coreOnly);
   return new Response('nope',{status:500});
  });
  assert.equal(deepTried,true);
  assert.equal(result.activeUsers,10);
  assert.equal(result.firstUser.length,0);
 });
+test('unparseable deep payload retries with sliced core reports',async()=>{
+ const badDeep={reports:[reports.reports[0],reports.reports[1],{metricHeaders:[{name:'weird'}],rows:[{dimensionValues:[{value:''}],metricValues:[{value:'x'}]}]},reports.reports[3],reports.reports[4]]};
+ // firstUser-like third report is malformed enough that older parsers threw; slice(0,2) still works.
+ const data=parseReports({reports:badDeep.reports.slice(0,2)},query,'550050295');
+ assert.equal(data.activeUsers,10);
+ const result=await fetchReport(query,'tok',async(_url,options)=>{
+  const body=JSON.parse(options.body);
+  if(body.requests.length===1)return new Response('nope',{status:500});
+  if(body.requests.length===5)return Response.json(badDeep);
+  if(body.requests[0].metrics.length===8)return Response.json({reports:[reports.reports[0],reports.reports[1]]});
+  return Response.json({reports:[
+   {metricHeaders:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'},{name:'newUsers'}],rows:[{metricValues:[{value:'10'},{value:'40'},{value:'70'},{value:'3'}]}]},
+   reports.reports[1],
+  ]});
+ });
+ assert.equal(result.activeUsers,10);
+});
 test('core-only report payload parses without breakdown tables',()=>{
  const core={reports:[reports.reports[0],reports.reports[1]]};
  const data=parseReports(core,query,'550050295');
  assert.equal(data.sessions,40);
  assert.deepEqual(data.countries,[]);
+});
+test('scientific notation and empty dimension values do not fail the report',()=>{
+ const payload={reports:[
+  {metricHeaders:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'},{name:'newUsers'},{name:'engagedSessions'},{name:'engagementRate'},{name:'averageSessionDuration'},{name:'sessionsPerUser'}],rows:[{metricValues:[{value:'1e1'},{value:'40'},{value:'70'},{value:'3'},{value:'28'},{value:'7.0E-1'},{value:'45.5'},{value:'4.0'}]}]},
+  {metricHeaders:[{name:'activeUsers'},{name:'newUsers'},{name:'sessions'}],dimensionHeaders:[{name:'date'}],rows:[{dimensionValues:[{value:'20261101'}],metricValues:[{value:'8'},{value:'2'},{value:'12'}]}]},
+  {metricHeaders:[{name:'newUsers'}],dimensionHeaders:[{name:'firstUserSource'},{name:'firstUserMedium'}],rows:[{dimensionValues:[{value:''},{value:''}],metricValues:[{value:'2'}]}]},
+  {metricHeaders:[{name:'activeUsers'},{name:'newUsers'}],dimensionHeaders:[{name:'country'}],rows:[]},
+  {metricHeaders:[{name:'activeUsers'}],dimensionHeaders:[{name:'appVersion'}],rows:[]},
+ ]};
+ const data=parseReports(payload,query,'558243778');
+ assert.equal(data.activeUsers,10);
+ assert.equal(data.engagementRate,0.7);
+ assert.equal(data.firstUser[0].source,'(not set)');
 });
