@@ -11,14 +11,17 @@
 - [x] Cloudflare D1 생성·운영 배포 (사용자 확인)
 - [x] 본인이 로그인 아이디·비밀번호 설정 (사용자 확인)
 - [x] 새 서버 암호화 키 등록 및 GA4 JSON 재등록 (사용자 연결 완료 확인)
-- [ ] OAuth 리디렉션 추가 및 AdMob 승인
-- [ ] 실제 계정 데이터와 콘솔 수치 대조
-- [x] 앱 레지스트리(D1)·앱 추가 마법사·동적 `/apps/:slug`
+- [ ] OAuth 리디렉션 URI 등록 및 AdMob 승인 (사용자)
+- [ ] 실제 계정 데이터와 콘솔 수치 대조 (사용자)
+- [x] 앱 레지스트리(D1)·앱 추가/수정 마법사·동적 `/apps/:slug`
 - [x] GA4·AdMob 일별 추세 차트 및 CTR·Overview 비교표
 - [x] GA4·AdMob 심화 (newUsers·firstUser·참여·Crash-free·매칭률·포맷·국가)
 - [x] Play / ASC 계정 연결 UI·암호화 저장·리포트 API (설치 CSV는 배치)
+- [x] Play 설치: Reporting API soft-fail + GCS 실시간 CSV + 배치 enrichment
+- [x] 세션 30일·아이디 기억·favicon·오늘/14일 프리셋·국가 확장·차트 선/막대
 - [x] Play GCS 설치·평점 CSV / ASC Sales Report 일 배치→D1 + cron
 - [x] Play 국가·버전·트래픽·store_performance / ASC Analytics ONGOING / 급변 배지 (P3)
+- [x] Overview/Connections 빈 상태·앱 수정·Progress 코드완료 표시
 - [ ] AppsFlyer API 연동 (무료 Zero — API 제외, ID 메타만)
 - [ ] P4: 정산·Crashlytics BQ·알림 채널 (선택)
 

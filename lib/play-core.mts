@@ -79,6 +79,50 @@ export async function playAccessToken(email:string,keyPem:string,fetcher:typeof 
  if(!res.ok)throw new PlayError(res.status===429?'quota_exceeded':'authentication_failed',res.status===429?429:502);
  const value=await res.json() as {access_token?:unknown};if(typeof value.access_token!=='string'||!value.access_token)throw new PlayError('authentication_failed');return value.access_token;
 }
+function ymdParts(ymd:string){return {year:Number(ymd.slice(0,4)),month:Number(ymd.slice(4,6)),day:Number(ymd.slice(6,8))};}
+function metricNumber(m:{decimalValue?:string;integerValue?:string}|undefined){const n=Number(m?.decimalValue??m?.integerValue??NaN);return Number.isFinite(n)?n:null;}
+/** Parse soft-attempted acquisition / install metric-set rows (Reporting API). Returns null if shape is unusable. */
+export function parseAcquisitionInstalls(body:unknown){
+ const v=body as {rows?:{startTime?:{year?:number;month?:number;day?:number};metrics?:{metric?:string;decimalValue?:string;integerValue?:string}[]}[]};
+ if(!v||!Array.isArray(v.rows)||!v.rows.length)return null;
+ const daily:{date:string;installs:number}[]=[];
+ for(const row of v.rows){
+  const t=row.startTime;if(!t?.year||!t?.month||!t?.day)continue;
+  const date=`${String(t.year).padStart(4,'0')}${String(t.month).padStart(2,'0')}${String(t.day).padStart(2,'0')}`;
+  const metrics=row.metrics||[];
+  const preferred=metrics.find(m=>/^(installs|newUsers|acquisitions|newDevices|installCount)$/i.test(String(m.metric||'')))||metrics[0];
+  const count=metricNumber(preferred);
+  if(count==null)continue;
+  daily.push({date,installs:Math.round(count)});
+ }
+ if(!daily.length)return null;
+ daily.sort((a,b)=>a.date.localeCompare(b.date));
+ return {daily,installs:daily.reduce((s,d)=>s+d.installs,0)};
+}
+/**
+ * Soft-fail attempt: Play Developer Reporting API does not currently publish an installs /
+ * userAcquisition metric set (vitals only). We still probe known candidate endpoints so a
+ * future API addition lights up without another deploy; failures return null.
+ */
+export async function fetchPlayAcquisitionInstalls(packageName:string,token:string,startYmd:string,endYmd:string,fetcher:typeof fetch=fetch){
+ if(!/^\d{8}$/.test(startYmd)||!/^\d{8}$/.test(endYmd))return null;
+ const start=ymdParts(startYmd),end=ymdParts(endYmd);
+ const timeline={timelineSpec:{aggregationPeriod:'DAILY',startTime:{...start,timeZone:{id:'America/Los_Angeles'}},endTime:{...end,timeZone:{id:'America/Los_Angeles'}}},pageSize:400};
+ const candidates:[string,string[]][]=[
+  ['userAcquisitionMetricSet',['newUsers','acquisitions']],
+  ['deviceAcquisitionMetricSet',['newDevices','acquisitions']],
+  ['installsMetricSet',['installs']],
+ ];
+ for(const [set,metrics] of candidates){
+  try{
+   const res=await fetcher(`https://playdeveloperreporting.googleapis.com/v1beta1/apps/${encodeURIComponent(packageName)}/${set}:query`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({...timeline,metrics}),signal:AbortSignal.timeout(12000)});
+   if(!res.ok)continue;
+   const parsed=parseAcquisitionInstalls(await res.json());
+   if(parsed)return {...parsed,source:'reporting_api' as const};
+  }catch{/* soft-fail */}
+ }
+ return null;
+}
 export async function fetchPlayReport(packageName:string,token:string,fetcher:typeof fetch=fetch){
  if(!packageName||!/^[a-zA-Z][\w.]*$/.test(packageName))throw new PlayError('invalid_query',400);
  const reviewsRes=await fetcher(`https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}/reviews?maxResults=20`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(15000)});
@@ -92,5 +136,5 @@ export async function fetchPlayReport(packageName:string,token:string,fetcher:ty
   const vitalsRes=await fetcher(`https://playdeveloperreporting.googleapis.com/v1beta1/apps/${encodeURIComponent(packageName)}/crashRateMetricSet:query`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({timelineSpec:{aggregationPeriod:'THIRTY_DAYS',startTime:{year:2020,month:1,day:1},endTime:{year:2099,month:1,day:1}},metrics:['crashRate','userPerceivedAnrRate']}),signal:AbortSignal.timeout(15000)});
   if(vitalsRes.ok)vitals=parseVitals(await vitalsRes.json());
  }catch{vitals=null;}
- return {packageName,installs:null as number|null,daily:[] as {date:string;installs:number}[],reviews,vitals,ratings:null as {average:number;count:number}|null,source:'live',limited:!vitals,fetchedAt:new Date().toISOString(),note:'설치·평점 CSV는 GCS 버킷 연결 후 배치로 적재합니다.'};
+ return {packageName,installs:null as number|null,daily:[] as {date:string;installs:number}[],reviews,vitals,ratings:null as {average:number;count:number}|null,source:'live',limited:!vitals,fetchedAt:new Date().toISOString(),note:'설치 수는 Reporting API에 없어 GCS CSV·배치가 필요합니다. 리뷰·바이탈은 실시간입니다.'};
 }

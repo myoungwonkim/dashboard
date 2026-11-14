@@ -1,5 +1,6 @@
 import {queryDates,dateMillis} from './date-range.mts';
 import {ADMOB_APP_ID_RE,SLUG_RE} from './apps.ts';
+import {isCountryFilter} from './countries.mts';
 // User-provided AdMob inventory. Identifiers are not authentication credentials.
 export const admobPublisherId='pub-4999376453226791';
 /** @deprecated Prefer registry inventory; kept for tests and seed display. */
@@ -12,7 +13,7 @@ export const admobApps=[
 export type AdmobInventory={os:'android'|'ios';appId:string};
 export type AdmobQuery={app:string;days:number;startDate?:string;endDate?:string;country:string;os:string};
 export function admobQuery(v:Record<string,unknown>):AdmobQuery{
- if(typeof v.app!=='string'||!SLUG_RE.test(v.app)||!['all','KR','JP','US'].includes(String(v.country))||!['all','android','ios'].includes(String(v.os)))throw Error('invalid_query');
+ if(typeof v.app!=='string'||!SLUG_RE.test(v.app)||!isCountryFilter(v.country)||!['all','android','ios'].includes(String(v.os)))throw Error('invalid_query');
  return {app:v.app,...queryDates(v),country:String(v.country),os:String(v.os)};
 }
 async function checked(response:Response){

@@ -1,6 +1,6 @@
 import {withGA4} from '../lib/ga4-context';
 import {withUser} from './identity';
-import {account,session,login,loginPage,cookie,digest,setCookie} from './auth.mts';
+import {account,session,login,loginPage,cookie,digest,setCookie,rememberedUsername} from './auth.mts';
 import * as ga4 from '../app/api/ga4/route';
 import * as ga4Setup from '../app/api/ga4/setup/route';
 import * as admob from '../app/api/admob/route';
@@ -15,12 +15,14 @@ import * as ascSetup from '../app/api/asc/setup/route';
 import * as storeBatch from '../app/api/store/batch/route';
 import {runStoreBatch} from '../lib/store-batch.mts';
 const routes:Record<string,Record<string,unknown>>={'/api/ga4':ga4,'/api/ga4/setup':ga4Setup,'/api/admob':admob,'/api/admob/setup':admobSetup,'/api/admob/oauth/start':start,'/api/admob/oauth/return':callback,'/api/apps':appsApi,'/api/play':playApi,'/api/play/setup':playSetup,'/api/asc':ascApi,'/api/asc/setup':ascSetup,'/api/store/batch':storeBatch};
+const PUBLIC_ASSETS=new Set(['/favicon.svg','/favicon.ico']);
 export async function handle(req:Request,env:any):Promise<Response>{
  const url=new URL(req.url),path=url.pathname;
  if(url.hostname==='dashboard.nolsoopgames.com'&&url.protocol!=='https:'){url.protocol='https:';return Response.redirect(url.toString(),308);}
  account(env.DASHBOARD_ACCOUNT);
- if(path==='/login'&&req.method==='GET')return new Response(loginPage(url.searchParams.has('error')),{headers:{'Content-Type':'text/html;charset=utf-8'}});
+ if(path==='/login'&&req.method==='GET')return new Response(loginPage(url.searchParams.has('error'),rememberedUsername(req)),{headers:{'Content-Type':'text/html;charset=utf-8'}});
  if(path==='/api/auth/login'&&req.method==='POST')return login(req,env);
+ if(PUBLIC_ASSETS.has(path)&&['GET','HEAD'].includes(req.method))return env.ASSETS.fetch(req);
  if(!await session(req,env))return path.startsWith('/api/')?Response.json({message:'로그인이 필요합니다.'},{status:401}):new Response(null,{status:303,headers:{Location:'/login'}});
  if(req.method!=='GET'&&req.method!=='HEAD'&&req.headers.get('origin')!==url.origin)return new Response('잘못된 요청입니다.',{status:403});
  if(path==='/api/auth/logout'&&req.method==='POST'){await env.DB.prepare('DELETE FROM dashboard_sessions WHERE id=?').bind(await digest(cookie(req))).run();return new Response(null,{status:303,headers:{Location:'/login','Set-Cookie':setCookie('',0)}});}

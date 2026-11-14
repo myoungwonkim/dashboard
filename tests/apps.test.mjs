@@ -9,9 +9,13 @@ test('slug and field validation for app registry',()=>{
  assert.throws(()=>validateAppInput({id:'ok',name:''}));
  assert.throws(()=>validateAppInput({id:'ok',name:'App',ga4PropertyId:'abc'}));
  assert.throws(()=>validateAppInput({id:'ok',name:'App',admobAndroidAppId:'bad'}));
- const ok=validateAppInput({id:'new-game',name:'새 게임',ga4PropertyId:'123456789',androidPkg:'com.nolsoopgames.newgame',admobAndroidAppId:'ca-app-pub-4999376453226791~5692726639'});
+ assert.throws(()=>validateAppInput({id:'ok',name:'App',appleAppId:'id123'}));
+ assert.throws(()=>validateAppInput({id:'ok',name:'App',iosBundleId:'bad'}));
+ const ok=validateAppInput({id:'new-game',name:'새 게임',ga4PropertyId:'123456789',androidPkg:'com.nolsoopgames.newgame',iosBundleId:'com.nolsoopgames.newgame',appleAppId:'1234567890',admobAndroidAppId:'ca-app-pub-4999376453226791~5692726639'});
  assert.equal(ok.id,'new-game');
  assert.equal(ok.ga4PropertyId,'123456789');
+ assert.equal(ok.appleAppId,'1234567890');
+ assert.equal(ok.iosBundleId,'com.nolsoopgames.newgame');
 });
 
 test('connection badges reflect partial links',()=>{

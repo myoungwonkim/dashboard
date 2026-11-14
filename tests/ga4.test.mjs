@@ -10,7 +10,7 @@ const reports={reports:[
  {metricHeaders:[{name:'activeUsers'}],dimensionHeaders:[{name:'appVersion'}],rows:[{dimensionValues:[{value:'1.2.0'}],metricValues:[{value:'7'}]}]},
 ]};
 const crash={reports:[{metricHeaders:[{name:'crashAffectedUsers'},{name:'crashFreeUsersRate'}],rows:[{metricValues:[{value:'1'},{value:'0.95'}]}]}]};
-test('only slug app IDs and bounded filters accepted',()=>{assert.deepEqual(parseQuery(query),query);for(const patch of [{app:'550050295'},{app:'__proto__'},{days:365},{country:'ZZ'},{os:'web'}])assert.throws(()=>parseQuery({...query,...patch}));assert.deepEqual(parseQuery({...query,app:'new-game'}).app,'new-game');});
+test('only slug app IDs and bounded filters accepted',()=>{assert.deepEqual(parseQuery(query),query);for(const patch of [{app:'550050295'},{app:'__proto__'},{days:365},{country:'ZZ'},{os:'web'}])assert.throws(()=>parseQuery({...query,...patch}));assert.deepEqual(parseQuery({...query,app:'new-game'}).app,'new-game');assert.equal(parseQuery({...query,country:'TW'}).country,'TW');});
 test('filters and yesterday-relative dates apply to both reports',()=>{const requests=reportsBody(query).requests;assert.equal(requests.length,5);assert.equal(requests[0].dateRanges[0].startDate,'7daysAgo');assert.equal(requests[0].dateRanges[0].endDate,'yesterday');assert.deepEqual(requests[0].dimensionFilter,requests[1].dimensionFilter);assert.equal(requests[0].dimensionFilter.andGroup.expressions.length,3);assert.equal(crashBody(query).requests[0].metrics.map(m=>m.name).join(','),'crashAffectedUsers,crashFreeUsersRate');});
 test('period users never summed from daily counts; missing days remain in denominator',()=>{const data=parseReports(reports,query,'550050295',crash);assert.equal(data.activeUsers,10);assert.equal(data.averageDau,2);assert.equal(data.sessions,40);assert.equal(data.newUsers,3);assert.equal(data.engagementRate,0.7);assert.equal(data.crashFreeUsersRate,0.95);assert.equal(data.firstUser[0].source,'google');assert.equal(data.countries[0].country,'South Korea');assert.equal(data.versions[0].version,'1.2.0');assert.equal(data.timeZone,'Asia/Seoul');});
 test('valid empty reports yield zero, malformed reports do not',()=>{const empty=structuredClone(reports);empty.reports.forEach(r=>delete r.rows);assert.equal(parseReports(empty,query,'550050295').activeUsers,0);assert.throws(()=>parseReports({},query,'550050295'));const broken=structuredClone(reports);broken.reports[0].rows[0].metricValues[0].value='oops';assert.throws(()=>parseReports(broken,query,'550050295'));});
@@ -29,6 +29,16 @@ test('a failed first property does not prevent checking the second property',asy
  const result=await verifyProperties('token',async url=>{calls.push(url);return new Response('{}',{status:403});});
  assert.equal(calls.length,2);assert.deepEqual(result.map(r=>[r.app,r.ok,r.code]),[['bazi',false,'permission_denied'],['sudoku',false,'permission_denied']]);
 });
+test('setup probe uses a single activeUsers request not the deep P1 batch',async()=>{
+ const {probeProperty}=await import('../lib/ga4-core.mts');
+ let body=null;
+ await probeProperty('550050295','tok',async(_url,options)=>{
+  body=JSON.parse(options.body);
+  return Response.json({reports:[{metricHeaders:[{name:'activeUsers'}],rows:[{metricValues:[{value:'1'}]}]}]});
+ });
+ assert.equal(body.requests.length,1);
+ assert.deepEqual(body.requests[0].metrics,[{name:'activeUsers'}]);
+});
 test('crash report failure still returns main metrics',async()=>{
  let n=0;
  const result=await fetchReport(query,'tok',async(_url,options)=>{
@@ -40,4 +50,54 @@ test('crash report failure still returns main metrics',async()=>{
  assert.equal(result.newUsers,3);
  assert.equal(result.crashAffectedUsers,null);
  assert.ok(n>=2);
+});
+test('deep batch failure falls back to core totals and daily',async()=>{
+ const coreOnly={reports:[reports.reports[0],reports.reports[1]]};
+ let deepTried=false;
+ const result=await fetchReport(query,'tok',async(_url,options)=>{
+  const body=JSON.parse(options.body);
+  if(body.requests.length===1)return new Response('nope',{status:500});
+  if(body.requests.length===5){deepTried=true;return new Response('nope',{status:500});}
+  if(body.requests[0].metrics.length===8)return Response.json(coreOnly);
+  return new Response('nope',{status:500});
+ });
+ assert.equal(deepTried,true);
+ assert.equal(result.activeUsers,10);
+ assert.equal(result.firstUser.length,0);
+});
+test('unparseable deep payload retries with sliced core reports',async()=>{
+ const badDeep={reports:[reports.reports[0],reports.reports[1],{metricHeaders:[{name:'weird'}],rows:[{dimensionValues:[{value:''}],metricValues:[{value:'x'}]}]},reports.reports[3],reports.reports[4]]};
+ // firstUser-like third report is malformed enough that older parsers threw; slice(0,2) still works.
+ const data=parseReports({reports:badDeep.reports.slice(0,2)},query,'550050295');
+ assert.equal(data.activeUsers,10);
+ const result=await fetchReport(query,'tok',async(_url,options)=>{
+  const body=JSON.parse(options.body);
+  if(body.requests.length===1)return new Response('nope',{status:500});
+  if(body.requests.length===5)return Response.json(badDeep);
+  if(body.requests[0].metrics.length===8)return Response.json({reports:[reports.reports[0],reports.reports[1]]});
+  return Response.json({reports:[
+   {metricHeaders:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'},{name:'newUsers'}],rows:[{metricValues:[{value:'10'},{value:'40'},{value:'70'},{value:'3'}]}]},
+   reports.reports[1],
+  ]});
+ });
+ assert.equal(result.activeUsers,10);
+});
+test('core-only report payload parses without breakdown tables',()=>{
+ const core={reports:[reports.reports[0],reports.reports[1]]};
+ const data=parseReports(core,query,'550050295');
+ assert.equal(data.sessions,40);
+ assert.deepEqual(data.countries,[]);
+});
+test('scientific notation and empty dimension values do not fail the report',()=>{
+ const payload={reports:[
+  {metricHeaders:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'},{name:'newUsers'},{name:'engagedSessions'},{name:'engagementRate'},{name:'averageSessionDuration'},{name:'sessionsPerUser'}],rows:[{metricValues:[{value:'1e1'},{value:'40'},{value:'70'},{value:'3'},{value:'28'},{value:'7.0E-1'},{value:'45.5'},{value:'4.0'}]}]},
+  {metricHeaders:[{name:'activeUsers'},{name:'newUsers'},{name:'sessions'}],dimensionHeaders:[{name:'date'}],rows:[{dimensionValues:[{value:'20261101'}],metricValues:[{value:'8'},{value:'2'},{value:'12'}]}]},
+  {metricHeaders:[{name:'newUsers'}],dimensionHeaders:[{name:'firstUserSource'},{name:'firstUserMedium'}],rows:[{dimensionValues:[{value:''},{value:''}],metricValues:[{value:'2'}]}]},
+  {metricHeaders:[{name:'activeUsers'},{name:'newUsers'}],dimensionHeaders:[{name:'country'}],rows:[]},
+  {metricHeaders:[{name:'activeUsers'}],dimensionHeaders:[{name:'appVersion'}],rows:[]},
+ ]};
+ const data=parseReports(payload,query,'558243778');
+ assert.equal(data.activeUsers,10);
+ assert.equal(data.engagementRate,0.7);
+ assert.equal(data.firstUser[0].source,'(not set)');
 });
