@@ -47,6 +47,6 @@ export default function PlaySetup(){
   <button className="setupbutton" type="button" disabled={!file||!setup||busy} onClick={()=>void connect()}>{busy?'확인 중…':setup?.configured?'키 교체':'암호화하여 연결'}</button>
   {setup?.configured&&<button className="refresh" type="button" disabled={busy} onClick={()=>void saveBucket()}>버킷만 저장</button>}
  </div>
- <p className="note">Reporting API는 크래시·ANR(바이탈)만 제공합니다. 설치·평점·국가 분해는 GCS CSV(+배치)가 필요합니다. 버킷이 있으면 조회 시 CSV를 실시간으로도 읽어 설치 합계를 채울 수 있습니다.</p>
+ <p className="note">Reporting API는 크래시·ANR(바이탈)만 제공합니다. 설치·평점·국가 분해는 GCS CSV(+배치)가 필요합니다. Play Console CSV는 UTF-16(압축)인 경우가 많아, 대시보드는 이를 자동 복호화합니다. 버킷만 있어도 Overview는 실시간 합계를 채울 수 있습니다.</p>
  </section>;
 }

@@ -13,6 +13,9 @@ export type AppRecord={
  admobIosAppId:string|null;
  afAndroidId:string|null;
  afIosId:string|null;
+ iconUrl:string|null;
+ iconSource:string|null;
+ iconFetchedAt:string|null;
  checks:unknown;
  checkedAt:string|null;
  createdAt:string;
