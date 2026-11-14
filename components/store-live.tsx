@@ -13,7 +13,7 @@ function DimTable({title,rows,metric}:{title:string;rows?:Dim[];metric:'installs
 export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRecord[];app?:string;days:number;startDate?:string;endDate?:string}){
  const [play,setPlay]=useState<Record<string,Result<PlayData>>>({});
  const [asc,setAsc]=useState<Record<string,Result<AscData>>>({});
- const [loading,setLoading]=useState(true),[retry,setRetry]=useState(0);
+ const [loading,setLoading]=useState(true);
  const playTargets=apps.filter(a=>a.androidPkg&&(!app||a.id===app));
  const ascTargets=apps.filter(a=>a.appleAppId&&(!app||a.id===app));
  useEffect(()=>{
@@ -24,12 +24,12 @@ export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRec
   if(!tasks.length){setLoading(false);return ()=>{active=false;c.abort();};}
   Promise.all(tasks).finally(()=>{if(active)setLoading(false);});
   return ()=>{active=false;c.abort();};
- },[app,days,startDate,endDate,retry,playTargets.map(t=>t.id).join(','),ascTargets.map(t=>t.id).join(',')]);
+ },[app,days,startDate,endDate,playTargets.map(t=>t.id).join(','),ascTargets.map(t=>t.id).join(',')]);
  const playCharts=playTargets.flatMap(a=>{const r=play[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 설치',color:appColor(a.id),points:r.data.daily.map(d=>({date:d.date,value:d.installs}))}];});
  const ascCharts=ascTargets.flatMap(a=>{const r=asc[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' iOS',color:appColor(a.id),dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.downloads}))}];});
  const detailPlay=app?play[app]:undefined;const detailAsc=app?asc[app]:undefined;
  return <section className="ga4live">
-  <div className="sectiontitle"><h2>스토어 · 유입 본선</h2><button className="refresh" disabled={loading} onClick={()=>setRetry(x=>x+1)}>{loading?'조회 중…':'새로고침'}</button></div>
+  <div className="sectiontitle"><h2>스토어 · 유입 본선</h2><span>{loading?'조회 중…':'Play · ASC'}</span></div>
   <p className="note">Play 설치·ASC 다운로드가 유입 1순위입니다. 미연결 시 가짜 숫자 없이 연결 안내만 표시합니다. · 실선=Play, 점선=ASC · 색=앱</p>
   <div className="livegrid" aria-live="polite">
    {playTargets.map(a=>{const r=play[a.id];return <article className="livecard" key={'play-'+a.id}><h3><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name} · Play</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
