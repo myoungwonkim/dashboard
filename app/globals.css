@@ -22,6 +22,23 @@
 .charttype button+button{border-left:1px solid #e2e2df}
 .batchwait{color:#888;font-size:12px}
 .batchwait a{text-decoration:underline;color:#555}
+.overviewkpi{margin:8px 0 28px}
+.overviewkpi .metric small{display:block;margin-top:6px;color:#999;font-size:11px}
+.viewmode{display:inline-flex;gap:4px;border:1px solid #e5e5e0;border-radius:8px;padding:3px;background:#fafafa}
+.viewmode button{border:0;background:transparent;padding:6px 12px;border-radius:6px;font:inherit;font-size:12px;color:#777;cursor:pointer}
+.viewmode button.selected{background:#fff;color:#242424;font-weight:600;box-shadow:0 0 0 1px #e5e5e0}
+.deeptoggle{margin:28px 0 8px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.verifychecklist{border:1px solid #ecece8;border-radius:12px;padding:20px 22px;margin:0 0 28px;background:#fbfbfa}
+.verifychecklist ol{margin:8px 0 0;padding-left:18px;color:#555;font-size:13px;line-height:1.65}
+.verifychecklist li{margin:4px 0}
+.checklist{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.checklist li{display:flex;align-items:center;gap:10px;font-size:13px;color:#888}
+.checklist li.ok{color:#333}
+.checklist li span{width:18px;text-align:center;font-weight:600}
+.checklist a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.playsteps{display:flex;gap:8px;margin:12px 0 16px}
+.playstep{flex:1;text-align:center;padding:10px 8px;border:1px solid #e5e5e0;border-radius:8px;font-size:12px;color:#999;background:#fff}
+.playstep.done{border-color:#cfcfc9;background:#f4f4f2;color:#333;font-weight:600}
 .appslist{display:grid;gap:12px;margin:8px 0 28px}
 .approw{display:flex;align-items:center;gap:14px;border:1px solid #e5e5e0;border-radius:8px;padding:16px 18px}
 .approw .meta{flex:1;min-width:0}.approw .meta strong{font-weight:500}.approw .meta span{display:block;font-size:11px;color:#999;margin-top:3px}

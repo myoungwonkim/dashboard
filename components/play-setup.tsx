@@ -30,11 +30,16 @@ export default function PlaySetup(){
  }
  return <section className="safenote ga4setup"><div className="sectiontitle"><h2>Google Play 연결</h2><span className="status">{setup?.configured?(setup.gcsBucket?'키·버킷 완료':'키만 완료'):'등록 대기'}</span></div>
  <p role="status" aria-live="polite">{message}</p>
+ <div className="playsteps" aria-label="Play 설치 3단계">
+  <div className={'playstep '+(setup?.configured?'done':'')}>1 키</div>
+  <div className={'playstep '+(setup?.gcsBucket?'done':'')}>2 버킷</div>
+  <div className="playstep">3 배치</div>
+ </div>
  <ol>
   <li>Play Console → 사용자 및 권한 → 새 사용자에 서비스 계정 초대 (앱 정보 보기·재무 데이터·리뷰 응답 등 읽기)</li>
-  <li><strong>설치 수용 GCS 버킷</strong>: Play Console → 다운로드 리포트(또는 설정 → API 액세스)에서 Cloud Storage URI의 버킷 이름만 복사합니다. 예: <code>pubsite_prod_rev_0123456789</code> (<code>gs://</code>·경로 제외)</li>
-  <li>서비스 계정에 해당 버킷 읽기 권한이 있는지 확인한 뒤 JSON 키를 등록합니다.</li>
-  <li>아래 <strong>스토어 배치</strong>를 한 번 실행합니다. (또는 UTC 21:00 cron) 배치 전에는 Overview에 「배치 대기」가 보입니다.</li>
+  <li><strong>설치용 GCS 버킷</strong>: Play Console → 다운로드 리포트에서 Cloud Storage URI의 버킷 이름만 복사. 예: <code>pubsite_prod_rev_0123456789</code> (<code>gs://</code>·경로 제외)</li>
+  <li>서비스 계정에 해당 버킷 <strong>읽기</strong> 권한이 있는지 확인한 뒤 JSON 키를 등록합니다.</li>
+  <li>아래 <strong>스토어 배치</strong>를 한 번 실행합니다. (UTC 21:00 cron) 버킷만 있어도 Overview는 CSV를 실시간으로 합산할 수 있습니다.</li>
  </ol>
  <div className="setupactions">
   <label className="filelabel">서비스 계정 JSON<input ref={input} type="file" accept=".json,application/json" disabled={!setup||busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label>

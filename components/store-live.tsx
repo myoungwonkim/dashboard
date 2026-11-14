@@ -9,7 +9,7 @@ type AscData={appleAppId:string;name:string;bundleId:string;downloads:number|nul
 type Result<T>={status:'success';data:T}|{status:'error';message:string;code?:string};
 function SpikeNote({spike}:{spike?:Spike|null}){if(!spike)return null;return <p className="note">급변 {spike.direction==='up'?'↑':'↓'} {spike.date}: {spike.value.toLocaleString()} (최근 평균 {Math.round(spike.baseline).toLocaleString()}{spike.ratio!=null?` · ×${spike.ratio.toFixed(1)}`:''})</p>;}
 function DimTable({title,rows,metric}:{title:string;rows?:Dim[];metric:'installs'|'visitors'}){if(!rows?.length)return null;return <div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>{title}</h2><span>Top</span></div><div className="tablewrap"><table><thead><tr><th>항목</th><th>{metric==='installs'?'설치':'방문'}</th><th>전환</th><th>평점</th></tr></thead><tbody>{rows.map(r=><tr key={r.key}><td>{r.key}</td><td>{(metric==='installs'?r.installs:r.visitors).toLocaleString()}</td><td>{r.conversions?r.conversions.toLocaleString():'—'}</td><td>{r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'}</td></tr>)}</tbody></table></div></div>;}
-export default function StoreLive({apps,app,days}:{apps:AppRecord[];app?:string;days:number}){
+export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRecord[];app?:string;days:number;startDate?:string;endDate?:string}){
  const [play,setPlay]=useState<Record<string,Result<PlayData>>>({});
  const [asc,setAsc]=useState<Record<string,Result<AscData>>>({});
  const [loading,setLoading]=useState(true),[retry,setRetry]=useState(0);
@@ -18,12 +18,12 @@ export default function StoreLive({apps,app,days}:{apps:AppRecord[];app?:string;
  useEffect(()=>{
   const c=new AbortController();let active=true;setLoading(true);setPlay({});setAsc({});
   const tasks:Promise<void>[]=[];
-  for(const a of playTargets)tasks.push((async()=>{let result:Result<PlayData>;try{const r=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days}),signal:c.signal});result=await r.json() as Result<PlayData>;}catch{result={status:'error',message:'Play 서버에 연결하지 못했습니다.'};}if(active)setPlay(p=>({...p,[a.id]:result}));})());
+  for(const a of playTargets)tasks.push((async()=>{let result:Result<PlayData>;try{const r=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate,endDate}),signal:c.signal});result=await r.json() as Result<PlayData>;}catch{result={status:'error',message:'Play 서버에 연결하지 못했습니다.'};}if(active)setPlay(p=>({...p,[a.id]:result}));})());
   for(const a of ascTargets)tasks.push((async()=>{let result:Result<AscData>;try{const r=await fetch('/api/asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days}),signal:c.signal});result=await r.json() as Result<AscData>;}catch{result={status:'error',message:'ASC 서버에 연결하지 못했습니다.'};}if(active)setAsc(p=>({...p,[a.id]:result}));})());
   if(!tasks.length){setLoading(false);return ()=>{active=false;c.abort();};}
   Promise.all(tasks).finally(()=>{if(active)setLoading(false);});
   return ()=>{active=false;c.abort();};
- },[app,days,retry,playTargets.map(t=>t.id).join(','),ascTargets.map(t=>t.id).join(',')]);
+ },[app,days,startDate,endDate,retry,playTargets.map(t=>t.id).join(','),ascTargets.map(t=>t.id).join(',')]);
  const playCharts=playTargets.flatMap(a=>{const r=play[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 설치',color:'#444',points:r.data.daily.map(d=>({date:d.date,value:d.installs}))}];});
  const ascCharts=ascTargets.flatMap(a=>{const r=asc[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 다운로드',color:'#888',dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.downloads}))}];});
  const detailPlay=app?play[app]:undefined;const detailAsc=app?asc[app]:undefined;

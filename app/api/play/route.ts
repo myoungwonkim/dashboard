@@ -25,8 +25,10 @@ export async function POST(req:Request){
   const account=validatePlayAccount(await unseal(JSON.parse(row.envelope),JSON.parse(config.privateKey),config.kid,'play'),row.gcsBucket);
   const token=await playAccessToken(account.client_email,account.private_key);
   const data=await fetchPlayReport(app.androidPkg,token);
-  const end=ymd(new Date(Date.now()-86400000));
-  const start=ymd(new Date(Date.now()-(q.days)*86400000));
+  const toYmd=(s?:string)=>{if(!s)return null;const n=s.replaceAll('-','');return /^\d{8}$/.test(n)?n:null;};
+  // Prefer explicit picker range so Overview filters match Play installs.
+  const end=toYmd(q.endDate)||ymd(new Date(Date.now()-86400000));
+  const start=toYmd(q.startDate)||ymd(new Date(Date.now()-(q.days)*86400000));
   const stored=await loadStoreRange(app.id,'play',start,end);
   const summary=summarizeStoreDays(stored);
   const hasBatch=stored.length>0;

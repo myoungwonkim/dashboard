@@ -33,6 +33,13 @@ test('play query accepts registry slugs only',()=>{
  assert.throws(()=>parsePlayQuery({app:'550050295',days:7}));
 });
 
+test('play query keeps optional startDate and endDate',()=>{
+ const q=parsePlayQuery({app:'bazi',days:14,startDate:'2026-11-01',endDate:'2026-11-14'});
+ assert.equal(q.startDate,'2026-11-01');
+ assert.equal(q.endDate,'2026-11-14');
+ assert.equal(parsePlayQuery({app:'sudoku',days:7}).startDate,undefined);
+});
+
 test('acquisition install parser sums daily metric rows',()=>{
  const parsed=parseAcquisitionInstalls({rows:[
   {startTime:{year:2026,month:11,day:1},metrics:[{metric:'newUsers',decimalValue:'4'}]},
