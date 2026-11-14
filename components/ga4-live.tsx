@@ -52,9 +52,9 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{ap
   ['평균 세션',fmtSec(result.data.averageSessionDuration)],
   ['이벤트',result.data.events.toLocaleString()],
   ['Crash-free',result.data.crashFreeUsersRate==null?'—':fmtRate(result.data.crashFreeUsersRate)],
-  ['평균 D1',fmtRate(result.data.retention?.summary.d1)],
-  ['평균 D7',fmtRate(result.data.retention?.summary.d7)],
- ].map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><small>시간대 {result.data.timeZone} · 조회 {new Date(result.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST{result.data.crashAffectedUsers!=null?` · 크래시 영향 ${result.data.crashAffectedUsers.toLocaleString()}명`:''}</small>{result.data.limited&&<p>임계값 또는 샘플링 등이 적용된 보고서입니다.</p>}</>}</article>})}
+  ['다음날 잔존율 (D1)',fmtRate(result.data.retention?.summary.d1)],
+  ['7일 잔존율 (D7)',fmtRate(result.data.retention?.summary.d7)],
+ ].map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><small>시간대 {result.data.timeZone} · 조회 {new Date(result.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST{result.data.crashAffectedUsers!=null?` · 크래시 영향 ${result.data.crashAffectedUsers.toLocaleString()}명`:''} · D1/D7=신규 코호트 잔존율 평균</small>{result.data.limited&&<p>임계값 또는 샘플링 등이 적용된 보고서입니다.</p>}</>}</article>})}
  </div>
  {!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 활성 · 신규 사용자</h2><span>GA4</span></div><TrendChart series={[...chartSeries,...newUserSeries]}/></div>}
  {!loading&&targets.map(a=>{
@@ -62,13 +62,13 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{ap
   const ret=r.data.retention;
   if(ret&&ret.rows.length){
    const offs=SHOW_OFFSETS.filter(d=>d<=ret.summary.endOffset);
-   return <div className="panel" style={{marginTop:20}} key={a.id+'-ret'}><div className="sectiontitle"><h2>일별 코호트 리텐션</h2><span>{a.name} · D0–D{ret.summary.endOffset} · {ret.summary.cohorts}코호트</span></div>
-    <p className="note">행=첫 세션일 · 열=경과일 · 평균 D1 {fmtRate(ret.summary.d1)} · D7 {fmtRate(ret.summary.d7)} · D14 {fmtRate(ret.summary.d14)} · D30 {fmtRate(ret.summary.d30)}{r.data.retentionNote?` · ${r.data.retentionNote}`:''}</p>
-    <div className="tablewrap retentionwrap"><table className="retention"><thead><tr><th>코호트</th><th>유저</th>{offs.map(d=><th key={d}>D{d}</th>)}</tr></thead>
+   return <div className="panel" style={{marginTop:20}} key={a.id+'-ret'}><div className="sectiontitle"><h2>일별 코호트 잔존율</h2><span>{a.name} · 첫 세션일 기준 · D0–D{ret.summary.endOffset}</span></div>
+    <p className="note">행=그날에 처음 연 사용자(코호트) · 열 Dn=그로부터 n일 뒤에도 활성인 비율. 코호트 평균: 다음날(D1) {fmtRate(ret.summary.d1)} · 7일(D7) {fmtRate(ret.summary.d7)} · 14일 {fmtRate(ret.summary.d14)} · 30일 {fmtRate(ret.summary.d30)}{r.data.retentionNote?` · ${r.data.retentionNote}`:''}</p>
+    <div className="tablewrap retentionwrap"><table className="retention"><thead><tr><th>첫 세션일</th><th>코호트 규모</th>{offs.map(d=><th key={d}>{d===0?'당일 (D0)':d===1?'다음날 (D1)':`${d}일 후 (D${d})`}</th>)}</tr></thead>
     <tbody>{ret.rows.map(row=><tr key={row.cohort}><td>{fmtCohort(row.cohort)}</td><td>{row.users?row.users.toLocaleString():'—'}</td>{offs.map(d=>{const v=row.rates[d]??null;return <td key={d} style={heat(v)}>{fmtRate(v)}</td>;})}</tr>)}</tbody></table></div>
    </div>;
   }
-  return <p className="note" key={a.id+'-ret-miss'}>{a.name}: {r.data.retentionNote||'코호트 리텐션을 불러오지 못했습니다. 기간을 7일 이상으로 두거나 앱 상세에서 다시 확인하세요.'}</p>;
+  return <p className="note" key={a.id+'-ret-miss'}>{a.name}: {r.data.retentionNote||'코호트 잔존율을 불러오지 못했습니다. 기간을 7일 이상으로 두거나 앱 상세에서 다시 확인하세요.'}</p>;
  })}
  {detailData&&!loading&&<>
  {!!detailData.firstUser?.length&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>유입 (firstUserSource / Medium)</h2><span>AF 대체 · Top 10</span></div><div className="tablewrap"><table><thead><tr><th>소스</th><th>매체</th><th>신규</th></tr></thead><tbody>{detailData.firstUser.map(r=><tr key={r.source+'/'+r.medium}><td>{r.source}</td><td>{r.medium}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
@@ -76,5 +76,5 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{ap
  {!!detailData.versions?.length&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>앱 버전</h2><span>활성 사용자</span></div><div className="tablewrap"><table><thead><tr><th>버전</th><th>활성</th></tr></thead><tbody>{detailData.versions.map(r=><tr key={r.version}><td>{r.version}</td><td>{r.activeUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
  </>}
  </>}
- <p className="note">조회에 실패하면 오류를 표시합니다. Crash-free는 Crashlytics 연동 속성에만 표시됩니다. 리텐션은 firstSessionDate 코호트입니다.</p></section>;
+ <p className="note">조회에 실패하면 오류를 표시합니다. Crash-free는 Crashlytics 연동 속성에만 표시됩니다. Dn 잔존율은 GA4 firstSessionDate 코호트(그날 첫 세션 유저) 기준입니다.</p></section>;
 }
