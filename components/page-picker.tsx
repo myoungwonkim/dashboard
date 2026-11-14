@@ -36,7 +36,7 @@ export default function PagePicker({page,apps,progressLabel}:{page:string;apps:A
 
  return <div className="pagepicker-wrap" ref={root}>
   <button type="button" className="pagepicker-trigger" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId} onClick={()=>setOpen(v=>!v)}>
-   {current?<span className="pagepicker-current"><AppIcon app={current} size={22}/><span className="appdot" style={{background:appColor(current.id)}} aria-hidden/>{label}</span>:label}
+   {current?<span className="pagepicker-current"><span className="appdot" style={{background:appColor(current.id)}} aria-hidden/>{label}</span>:label}
    <ChevronDown size={14} aria-hidden/>
   </button>
   {open&&<div className="pagepicker-menu" role="listbox" id={listId} aria-label="페이지 및 앱 선택">
@@ -46,7 +46,7 @@ export default function PagePicker({page,apps,progressLabel}:{page:string;apps:A
    <div className="pagepicker-group"><div className="pagepicker-label">앱 {apps.length?`· ${apps.length}`:''}</div>
     {!apps.length&&<p className="pagepicker-empty">등록된 앱 없음</p>}
     {apps.map(a=><button type="button" role="option" key={a.id} aria-selected={value===a.id} className={'pagepicker-app'+(value===a.id?' selected':'')} onClick={()=>go(a.id)}>
-     <AppIcon app={a} size={28}/><span className="pagepicker-appmeta"><strong><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}</strong><small>{a.androidPkg||a.id}</small></span>
+     <span className="pagepicker-appmeta"><strong><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}</strong><small>{a.androidPkg||a.id}</small></span>
     </button>)}
    </div>
    <div className="pagepicker-group"><div className="pagepicker-label">관리</div>
