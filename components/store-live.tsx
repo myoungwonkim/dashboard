@@ -13,7 +13,7 @@ type PlayData={packageName:string;installs:number|null;uninstalls?:number|null;r
 type AscData={appleAppId:string;name:string;bundleId:string;downloads:number|null;reviews?:{id:string;rating:number;title:string;text:string;author:string;at:string|null}[];daily?:{date:string;downloads:number}[];spike?:Spike|null;perf?:Perf|null;note?:string;fetchedAt:string};
 type Result<T>={status:'success';data:T}|{status:'error';message:string;code?:string};
 function SpikeNote({spike}:{spike?:Spike|null}){if(!spike)return null;return <p className="note">급변 {spike.direction==='up'?'↑':'↓'} {spike.date}: {spike.value.toLocaleString()} (최근 평균 {Math.round(spike.baseline).toLocaleString()}{spike.ratio!=null?` · ×${spike.ratio.toFixed(1)}`:''})</p>;}
-function DimTable({title,rows,metric}:{title:string;rows?:Dim[];metric:'installs'|'visitors'}){if(!rows?.length)return null;return <div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>{title}</h2><span>Top</span></div><div className="tablewrap"><table><thead><tr><th>항목</th><th>{metric==='installs'?'설치':'방문'}</th><th>전환</th><th>평점</th></tr></thead><tbody>{rows.map(r=><tr key={r.key}><td>{r.key}</td><td>{(metric==='installs'?r.installs:r.visitors).toLocaleString()}</td><td>{r.conversions?r.conversions.toLocaleString():'—'}</td><td>{r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'}</td></tr>)}</tbody></table></div></div>;}
+function DimTable({title,rows,metric}:{title:string;rows?:Dim[];metric:'installs'|'visitors'}){if(!rows?.length)return null;return <div className="panel panel-narrow" style={{marginTop:16}}><div className="sectiontitle"><h2>{title}</h2><span>Top</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>항목</th><th>{metric==='installs'?'설치':'방문'}</th><th>전환</th><th>평점</th></tr></thead><tbody>{rows.slice(0,12).map(r=><tr key={r.key}><td className="cell-text">{r.key}</td><td>{(metric==='installs'?r.installs:r.visitors).toLocaleString()}</td><td>{r.conversions?r.conversions.toLocaleString():'—'}</td><td>{r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'}</td></tr>)}</tbody></table></div></div>;}
 export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRecord[];app?:string;days:number;startDate?:string;endDate?:string}){
  const [play,setPlay]=useState<Record<string,Result<PlayData>>>({});
  const [asc,setAsc]=useState<Record<string,Result<AscData>>>({});
@@ -71,7 +71,7 @@ export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRec
     <div><dt>전환율</dt><dd>{r.data.perf?.conversionRate!=null?(r.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</dd></div>
     <div><dt>Crash-free</dt><dd>{r.data.vitals?((r.data.vitals.crashFreeRate)*100).toFixed(2)+'%':'—'}</dd></div>
    </dl><SpikeNote spike={r.data.spike}/>{r.data.note&&<p className="note">{r.data.note}</p>}<small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</small>
-   {!!r.data.reviews.length&&<div className="tablewrap" style={{marginTop:12}}><table><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td style={{whiteSpace:'normal',textAlign:'left'}}>{v.text||v.author}</td></tr>)}</tbody></table></div>}
+   {!!r.data.reviews.length&&<div className="tablewrap" style={{marginTop:12}}><table className="dense"><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td className="cell-text">{v.text||v.author}</td></tr>)}</tbody></table></div>}
    </>}</article>;})}
    {ascTargets.map(a=>{const r=asc[a.id];return <article className="livecard" key={'asc-'+a.id}><h3><AppMark id={a.id} name={a.name}/> · App Store</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">ASC 연결 →</a></>:<><dl>
     <div><dt>Apple ID</dt><dd>{r.data.appleAppId}</dd></div>
@@ -81,7 +81,7 @@ export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRec
     <div><dt>전환율</dt><dd>{r.data.perf?.conversionRate!=null?(r.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</dd></div>
     <div><dt>최근 리뷰</dt><dd>{(r.data.reviews?.length||0).toLocaleString()}</dd></div>
    </dl><SpikeNote spike={r.data.spike}/>{r.data.note&&<p className="note">{r.data.note}</p>}<small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</small>
-   {!!r.data.reviews?.length&&<div className="tablewrap" style={{marginTop:12}}><table><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td style={{whiteSpace:'normal',textAlign:'left'}}>{v.title||v.text||v.author}</td></tr>)}</tbody></table></div>}
+   {!!r.data.reviews?.length&&<div className="tablewrap" style={{marginTop:12}}><table className="dense"><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td className="cell-text">{v.title||v.text||v.author}</td></tr>)}</tbody></table></div>}
    </>}</article>;})}
    {!playTargets.length&&!ascTargets.length&&<p className="note">스토어 ID(패키지·Apple App ID)가 등록된 앱이 없습니다.</p>}
   </div>

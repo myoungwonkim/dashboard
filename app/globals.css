@@ -84,6 +84,27 @@
 .formerror{color:#666;font-size:13px}
 @media(max-width:720px){.wizard{grid-template-columns:1fr}.steps{border:0;display:flex;flex-wrap:wrap;gap:4px;padding:0}.step{margin:0}}
 
-.retentionwrap{overflow-x:auto}
+.retentionwrap{overflow-x:auto;max-width:100%}
 .retention th,.retention td{text-align:right;font-variant-numeric:tabular-nums;font-size:12px;padding:6px 8px}
 .retention th:first-child,.retention td:first-child,.retention th:nth-child(2),.retention td:nth-child(2){text-align:left}
+/* Dense / readable tables — prefer wrapping labels over ultra-wide nowrap sprawl */
+table.dense{white-space:normal}
+table.dense th,table.dense td{padding:8px 10px;font-size:12px;vertical-align:top}
+table.dense td.cell-text,table.dense th.cell-text,.cell-text{text-align:left;white-space:normal;overflow-wrap:anywhere;max-width:220px;line-height:1.35}
+.panel-narrow{max-width:560px}
+.panel-mid{max-width:720px}
+.panel-wide{max-width:880px}
+/* App detail: stop KPI cards and panels from stretching across ultra-wide viewports */
+.appreport main{max-width:960px}
+.appreport .livegrid{grid-template-columns:minmax(0,560px);justify-content:start}
+.appreport .livecard{max-width:560px}
+.appreport .ga4live>.panel,.appreport .ga4live .panel-wide{max-width:880px}
+.appreport .tablewrap th,.appreport .tablewrap td{padding:10px 10px}
+.appreport .tablewrap table.dense{white-space:normal}
+/* Overview compare: sticky app column, denser cells */
+.comparewrap{overflow:auto;max-width:100%}
+.comparewrap table{font-size:12px;width:100%}
+.comparewrap th,.comparewrap td{padding:12px 10px}
+.comparewrap th:first-child,.comparewrap td:first-child{position:sticky;left:0;background:#fff;z-index:1;box-shadow:1px 0 0 #eee}
+.comparewrap th:first-child{background:#fafaf9}
+.comparewrap .applink small{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
