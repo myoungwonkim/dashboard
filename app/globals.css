@@ -14,7 +14,11 @@
 .float-refresh:disabled{opacity:.55;cursor:wait}
 .float-refresh:focus-visible{outline:2px solid #777;outline-offset:3px}
 @media(max-width:720px){.float-refresh{top:12px;right:12px;padding:9px 12px;font-size:12px}}
-.livecard h3{font-size:14px;margin:0 0 14px}
+.livecard h3{font-size:15px;font-weight:600;margin:0 0 14px;color:#1f1f1f}
+.livecard.aggregate{border-color:#cfcfc9;background:#fafaf8}
+.livecard.aggregate h3 small{font-weight:400;color:#888;margin-left:8px;font-size:12px}
+.apptitle{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:#1f1f1f}
+.sectiontitle h2 .apptitle{font-size:inherit}
 .livecard p{font-size:13px;color:#666}
 .livecard dl{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .livecard dl>div{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid #eee;border-radius:6px;background:#fafafa;min-width:0}
@@ -60,7 +64,7 @@
 .appicon.img{object-fit:cover;border-radius:8px;background:#f4f4f2;display:block;flex-shrink:0}
 .ga4setup ol.nested{margin:8px 0 4px;padding-left:18px;color:#555;font-size:13px;line-height:1.65}
 .ga4setup ol.nested li{margin:4px 0}
-.livecard h3{display:flex;align-items:center;gap:0;font-size:14px;margin:0 0 14px}
+.livecard h3{display:flex;align-items:center;gap:0}
 .chartcontrols{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
 .appslist{display:grid;gap:12px;margin:8px 0 28px}
 .approw{display:flex;align-items:center;gap:14px;border:1px solid #e5e5e0;border-radius:8px;padding:16px 18px}
