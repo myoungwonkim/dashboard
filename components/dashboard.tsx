@@ -4,7 +4,7 @@ import {COUNTRY_OPTIONS} from '@/lib/countries.mts';
 import {useEffect,useMemo,useState} from 'react';
 import Link from '@/client/navigation';
 import {useRouter} from '@/client/navigation';
-import {ArrowUpRight,Check,ChevronRight,RefreshCw} from 'lucide-react';
+import {ArrowUpRight,Check,ChevronDown,ChevronRight,RefreshCw} from 'lucide-react';
 import {appBadges,type AppRecord} from '@/lib/apps';
 import {appColor} from '@/lib/app-colors';
 import AppIcon from './app-icon';
@@ -51,6 +51,7 @@ export default function Dashboard({page}:{page:string}){
  const [showForm,setShowForm]=useState(false);
  const [editing,setEditing]=useState<AppRecord|null>(null);
  const [showDeep,setShowDeep]=useState(false);
+ const [showNotices,setShowNotices]=useState(false);
  const [refreshing,setRefreshing]=useState(false);
  type CompareRow={ga4?:Ga4Row;admob?:AdmobRow;store?:StoreRow;ga4Error?:string;admobError?:string;playError?:string;playCode?:string};
  const [compare,setCompare]=useState<Record<string,CompareRow>>({});
@@ -151,6 +152,13 @@ export default function Dashboard({page}:{page:string}){
   if(!a.androidPkg||!row?.playError)return '';
   return `${a.name}: ${row.playError}`;
  }).filter(Boolean);
+ const noticeCount=1
+  +Number(page==='overview'&&needsSetup&&appsLoaded&&!appsError)
+  +Number(page==='overview'&&playInstallGap&&!needsSetup)
+  +Number(os==='ios')
+  +Number(!!overviewGa4Errors.length)
+  +Number(!!overviewPlayErrors.length)
+  +Number(!overviewPlayErrors.length&&page==='overview'&&!!playSetup&&!playSetup.gcsBucket&&!!apps.some(a=>a.androidPkg));
 
  const checklist=[
   {ok:ga4Verified,label:'GA4 서비스 계정 · 속성 조회',href:'#ga4'},
@@ -164,13 +172,21 @@ export default function Dashboard({page}:{page:string}){
  <button type="button" className="float-refresh" disabled={refreshing} onClick={refreshPage} aria-label="데이터 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button>
  <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'필수 연결을 위에서부터 순서대로 완료하세요.'}</p></div><div className="titleactions">{page==='connections'&&!showForm&&!editing&&<button type="button" className="setupbutton" onClick={()=>{setEditing(null);setShowForm(true);}}>앱 추가</button>}</div></div>
  {appsError&&<div className="notice" role="status"><span className="dot"/>{appsError}<button type="button" className="refresh" onClick={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}>다시 시도</button></div>}
- {report&&<><div className="notice"><span className="dot"/>표시 숫자는 실조회입니다. AppsFlyer Zero는 API 없음.<Link href="/connections">연결 <ArrowUpRight size={13}/></Link></div>
- {page==='overview'&&needsSetup&&appsLoaded&&!appsError&&<div className="notice setuphint"><span className="dot"/>미연결 항목이 있으면 — 로 나옵니다. Play 설치가 비면 GCS 버킷·배치를 확인하세요. iOS/ASC는 출시 전 생략 가능.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
- {page==='overview'&&playInstallGap&&!needsSetup&&<div className="notice setuphint" role="status"><span className="dot"/>Play 설치가 아직 비어 있습니다. Connections → GCS 버킷 → 스토어 배치를 실행한 뒤 새로고침하세요.</div>}
- {os==='ios'&&<div className="notice setuphint" role="status"><span className="dot"/>OS 필터가 iOS입니다. iOS 미출시면 수치가 0 또는 — 로 나옵니다. Android 또는 전체 OS로 바꿔 보세요.</div>}
- {!!overviewGa4Errors.length&&<div className="notice setuphint" role="status"><span className="dot"/>GA4 조회 오류 — {overviewGa4Errors.join(' · ')}</div>}
- {!!overviewPlayErrors.length&&<div className="notice setuphint" role="status"><span className="dot"/>Play 조회 오류 — {overviewPlayErrors.join(' · ')}{!playSetup?.gcsBucket?' · GCS 버킷을 Connections에 등록하세요.':''}<Link href="/connections">연결 <ArrowUpRight size={13}/></Link></div>}
- {!overviewPlayErrors.length&&page==='overview'&&playSetup&&!playSetup.gcsBucket&&!!apps.some(a=>a.androidPkg)&&<div className="notice setuphint" role="status"><span className="dot"/>Play 설치는 GCS 버킷이 필요합니다. 앱 안 「통계→보고서 내보내기」가 아니라, 홈으로 나간 뒤 <strong>다운로드 보고서(또는 계정 관리→Google Play 앱 보고서)→통계→Cloud Storage URI 복사</strong>로 <code>pubsite_prod_rev_…</code>를 Connections에 넣으세요.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
+ {report&&<><div className="noticefold">
+  <button type="button" className="noticefold-toggle" aria-expanded={showNotices} onClick={()=>setShowNotices(v=>!v)}>
+   <span>안내 · 알림 {noticeCount}건</span>
+   <span className="noticefold-action">{showNotices?'접기':'펼치기'} <ChevronDown size={14} className={showNotices?'open':undefined} aria-hidden/></span>
+  </button>
+  {showNotices&&<div className="noticefold-body">
+   <div className="notice"><span className="dot"/>표시 숫자는 실조회입니다. AppsFlyer Zero는 API 없음.<Link href="/connections">연결 <ArrowUpRight size={13}/></Link></div>
+   {page==='overview'&&needsSetup&&appsLoaded&&!appsError&&<div className="notice setuphint"><span className="dot"/>미연결 항목이 있으면 — 로 나옵니다. Play 설치가 비면 GCS 버킷·배치를 확인하세요. iOS/ASC는 출시 전 생략 가능.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
+   {page==='overview'&&playInstallGap&&!needsSetup&&<div className="notice setuphint" role="status"><span className="dot"/>Play 설치가 아직 비어 있습니다. Connections → GCS 버킷 → 스토어 배치를 실행한 뒤 새로고침하세요.</div>}
+   {os==='ios'&&<div className="notice setuphint" role="status"><span className="dot"/>OS 필터가 iOS입니다. iOS 미출시면 수치가 0 또는 — 로 나옵니다. Android 또는 전체 OS로 바꿔 보세요.</div>}
+   {!!overviewGa4Errors.length&&<div className="notice setuphint" role="status"><span className="dot"/>GA4 조회 오류 — {overviewGa4Errors.join(' · ')}</div>}
+   {!!overviewPlayErrors.length&&<div className="notice setuphint" role="status"><span className="dot"/>Play 조회 오류 — {overviewPlayErrors.join(' · ')}{!playSetup?.gcsBucket?' · GCS 버킷을 Connections에 등록하세요.':''}<Link href="/connections">연결 <ArrowUpRight size={13}/></Link></div>}
+   {!overviewPlayErrors.length&&page==='overview'&&playSetup&&!playSetup.gcsBucket&&!!apps.some(a=>a.androidPkg)&&<div className="notice setuphint" role="status"><span className="dot"/>Play 설치는 GCS 버킷이 필요합니다. 앱 안 「통계→보고서 내보내기」가 아니라, 홈으로 나간 뒤 <strong>다운로드 보고서(또는 계정 관리→Google Play 앱 보고서)→통계→Cloud Storage URI 복사</strong>로 <code>pubsite_prod_rev_…</code>를 Connections에 넣으세요.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
+  </div>}
+ </div>
  <div className="filterbar"><DateRangePicker value={dateRange} onChange={setDateRange}/><label>국가<select aria-label="국가" value={country} onChange={e=>setCountry(e.target.value)}>{COUNTRY_OPTIONS.map(o=><option key={o.code} value={o.code}>{o.label}</option>)}</select></label><label>OS<select aria-label="OS" value={os} onChange={e=>setOs(e.target.value)}><option value="all">전체 OS</option><option value="android">Android</option><option value="ios">iOS</option></select></label><span className="range">각 서비스 시간대 기준 · {days}일</span></div>
 
  {page==='overview'&&!!apps.length&&<>
