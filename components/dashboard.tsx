@@ -43,7 +43,8 @@ export default function Dashboard({page}:{page:string}){
  const [ga4Verified,setGa4Verified]=useState(false),[admobVerified,setAdmobVerified]=useState(false);
  const [showForm,setShowForm]=useState(false);
  const [editing,setEditing]=useState<AppRecord|null>(null);
- const [compare,setCompare]=useState<Record<string,{ga4?:Ga4Row;admob?:AdmobRow;store?:StoreRow}>>({});
+ type CompareRow={ga4?:Ga4Row;admob?:AdmobRow;store?:StoreRow;ga4Error?:string;admobError?:string};
+ const [compare,setCompare]=useState<Record<string,CompareRow>>({});
  useEffect(()=>{
   setAppsError('');
   fetch('/api/apps',{cache:'no-store'}).then(async r=>{
@@ -53,7 +54,7 @@ export default function Dashboard({page}:{page:string}){
   }).catch(()=>{setAppsError('앱 목록을 불러오지 못했습니다.');setApps([]);}).finally(()=>setAppsLoaded(true));
  },[appsRetry]);
  useEffect(()=>{fetch('/api/admob/setup',{cache:'no-store'}).then(async r=>{if(r.ok){const v=await r.json() as {verifiedAt:string|null};setAdmobVerified(!!v.verifiedAt);}}).catch(()=>{});},[]);
- useEffect(()=>{fetch('/api/ga4/setup',{cache:'no-store'}).then(async r=>{if(!r.ok)return;const v=await r.json() as {configured:boolean,checks?:{ok:boolean}[]};setGa4Verified(!!v.checks?.length&&v.checks.every(c=>c.ok));}).catch(()=>{});},[]);
+ useEffect(()=>{fetch('/api/ga4/setup',{cache:'no-store'}).then(async r=>{if(!r.ok)return;const v=await r.json() as {configured:boolean,checks?:{ok:boolean}[]};setGa4Verified(!!v.checks?.some(c=>c.ok));}).catch(()=>{});},[]);
  const [dateRange,setDateRange]=useState(()=>presetRange('7'));
  const days=validateRange(dateRange.startDate,dateRange.endDate).days;
  const [country,setCountry]=useState('all'),[os,setOs]=useState('all');
@@ -64,19 +65,21 @@ export default function Dashboard({page}:{page:string}){
  const doneBase=codeDone+Number(admobVerified);
  const pageOptions=useMemo(()=>[['overview','서비스 현황'],...apps.map(a=>[a.id,a.name] as [string,string]),['progress','진행상황'],['connections','데이터 연결']],[apps]);
  const missingAsc=apps.filter(a=>!a.appleAppId);
- const needsSetup=!ga4Verified||!admobVerified||apps.some(a=>!a.androidPkg)||!!missingAsc.length;
+ // iOS/ASC는 출시 전이면 선택. Play 패키지·GA4·AdMob만 필수 안내.
+ const needsSetup=!ga4Verified||!admobVerified||apps.some(a=>!a.androidPkg);
+ const overviewGa4Errors=apps.map(a=>compare[a.id]?.ga4Error?`${a.name}: ${compare[a.id]!.ga4Error}`:'').filter(Boolean);
 
  useEffect(()=>{
   if(page!=='overview'||!apps.length)return;
   const controller=new AbortController();
   setCompare({});
   Promise.all(apps.map(async a=>{
-   const next:{ga4?:Ga4Row;admob?:AdmobRow;store?:StoreRow}={store:{}};
+   const next:CompareRow={store:{}};
    if(a.ga4PropertyId){
-    try{const res=await fetch('/api/ga4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate,country,os}),signal:controller.signal});const body=await res.json() as {status:string;data?:Ga4Row};if(res.ok&&body.status==='success'&&body.data)next.ga4=body.data;}catch{}
+    try{const res=await fetch('/api/ga4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate,country,os}),signal:controller.signal});const body=await res.json() as {status:string;data?:Ga4Row;message?:string};if(res.ok&&body.status==='success'&&body.data)next.ga4=body.data;else next.ga4Error=body.message||'GA4 조회 실패';}catch{next.ga4Error='GA4 서버 연결 실패';}
    }
    if(a.admobAndroidAppId||a.admobIosAppId){
-    try{const res=await fetch('/api/admob',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate,country,os}),signal:controller.signal});const body=await res.json() as {status:string;data?:AdmobRow&{ctr?:number;clicks:number;impressions:number}};if(res.ok&&body.status==='success'&&body.data)next.admob={...body.data,ctr:body.data.ctr??(body.data.impressions?body.data.clicks/body.data.impressions:0)};}catch{}
+    try{const res=await fetch('/api/admob',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate,country,os}),signal:controller.signal});const body=await res.json() as {status:string;data?:AdmobRow&{ctr?:number;clicks:number;impressions:number};message?:string};if(res.ok&&body.status==='success'&&body.data)next.admob={...body.data,ctr:body.data.ctr??(body.data.impressions?body.data.clicks/body.data.impressions:0)};else next.admobError=body.message||'AdMob 조회 실패';}catch{next.admobError='AdMob 서버 연결 실패';}
    }
    if(a.androidPkg){
     try{const res=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days}),signal:controller.signal});const body=await res.json() as {status:string;data?:{installs:number|null}};if(res.ok&&body.status==='success')next.store!.playInstalls=body.data?.installs??null;}catch{}
@@ -97,11 +100,13 @@ export default function Dashboard({page}:{page:string}){
  <div className="workspace"><header><div>워크스페이스 <ChevronRight size={13}/><select className="pagepicker" aria-label="페이지 및 앱 선택" value={page==='overview'||page==='progress'||page==='connections'?page:(current?page:'overview')} onChange={e=>{const v=e.target.value;router.push(v==='overview'?'/':v==='progress'?'/progress':v==='connections'?'/connections':`/apps/${v}`);}}>{pageOptions.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'운영하는 앱의 유입, 활동, 수익을 한눈에.':page==='progress'?'P0–P3 코드는 배포됨. 남은 항목은 계정 연결과 수치 대조입니다.':'계정 연결과 앱 식별자를 등록합니다.'}</p></div>{page==='connections'&&!showForm&&!editing&&<button type="button" className="setupbutton" onClick={()=>{setEditing(null);setShowForm(true);}}>앱 추가</button>}</div>
  {appsError&&<div className="notice" role="status"><span className="dot"/>{appsError}<button type="button" className="refresh" onClick={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}>다시 시도</button></div>}
  {report&&<><div className="notice"><span className="dot"/>GA4·AdMob·스토어 실제 보고서를 조회합니다. AppsFlyer 무료(Zero)는 API 미연동입니다.<Link href="/connections">연결 안내 <ArrowUpRight size={13}/></Link></div>
- {page==='overview'&&needsSetup&&appsLoaded&&!appsError&&<div className="notice setuphint"><span className="dot"/>수치가 — 이면 미연결이거나 배치 전입니다. GA4 키 · AdMob OAuth · Play/ASC 키 · 앱 수정(Apple ID) · 스토어 배치를 Connections에서 완료하세요.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
+ {page==='overview'&&needsSetup&&appsLoaded&&!appsError&&<div className="notice setuphint"><span className="dot"/>수치가 — 이면 미연결·조회 실패·배치 전일 수 있습니다. (iOS/ASC는 출시 전이면 생략 가능)<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
+ {os==='ios'&&<div className="notice setuphint" role="status"><span className="dot"/>OS 필터가 iOS입니다. iOS 미출시면 수치가 0 또는 — 로 나옵니다. Android 또는 전체 OS로 바꿔 보세요.</div>}
+ {!!overviewGa4Errors.length&&<div className="notice setuphint" role="status"><span className="dot"/>GA4 조회 오류 — {overviewGa4Errors.join(' · ')}</div>}
  <div className="filterbar"><DateRangePicker value={dateRange} onChange={setDateRange}/><label>국가<select aria-label="국가" value={country} onChange={e=>setCountry(e.target.value)}><option value="all">전체 국가</option><option value="KR">한국</option><option value="JP">일본</option><option value="US">미국</option></select></label><label>OS<select aria-label="OS" value={os} onChange={e=>setOs(e.target.value)}><option value="all">전체 OS</option><option value="android">Android</option><option value="ios">iOS</option></select></label><span className="range">각 데이터 제공 서비스의 시간대 기준</span></div>
  {page==='overview'&&<div className="sectiontitle"><h2>앱 비교</h2><span>같은 필터 · 행 클릭 시 상세</span></div>}
  {page==='overview'&&appsLoaded&&!apps.length&&!appsError&&<div className="empty"><h2>등록된 앱이 없습니다</h2><p>마이그레이션·시드 후 Connections에서 앱을 추가하세요.</p><p className="note"><Link href="/connections">데이터 연결로 이동</Link></p></div>}
- {page==='overview'&&!!apps.length&&<div className="tablewrap"><table><thead><tr><th>앱</th><th>DAU</th><th>활성</th><th>신규</th><th>Play 설치</th><th>ASC 다운</th><th>세션</th><th>수익</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{apps.map(a=>{const row=compare[a.id];return <tr key={a.id} style={{cursor:'pointer'}} onClick={()=>router.push(`/apps/${a.id}`)}><td><div className="applink"><span className="appicon">{a.symbol||a.name.slice(0,1)}</span><span>{a.name}<small>{a.androidPkg||a.id}</small></span></div></td><td>{row?.ga4?row.ga4.averageDau.toLocaleString():'—'}</td><td>{row?.ga4?row.ga4.activeUsers.toLocaleString():'—'}</td><td>{row?.ga4?(row.ga4.newUsers??0).toLocaleString():'—'}</td><td>{row?.store?.playInstalls!=null?row.store.playInstalls.toLocaleString():'—'}</td><td>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():'—'}</td><td>{row?.ga4?row.ga4.sessions.toLocaleString():'—'}</td><td>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</td><td>{row?.admob?'$'+row.admob.ecpm.toFixed(2):'—'}</td><td>{row?.admob?(row.admob.ctr*100).toFixed(2)+'%':'—'}</td></tr>;})}</tbody></table></div>}
+ {page==='overview'&&!!apps.length&&<div className="tablewrap"><table><thead><tr><th>앱</th><th>DAU</th><th>활성</th><th>신규</th><th>Play 설치</th><th>ASC 다운</th><th>세션</th><th>수익</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{apps.map(a=>{const row=compare[a.id];return <tr key={a.id} style={{cursor:'pointer'}} onClick={()=>router.push(`/apps/${a.id}`)}><td><div className="applink"><span className="appicon">{a.symbol||a.name.slice(0,1)}</span><span>{a.name}<small>{a.androidPkg||a.id}{row?.ga4Error?' · GA4 오류':''}</small></span></div></td><td>{row?.ga4?row.ga4.averageDau.toLocaleString():'—'}</td><td>{row?.ga4?row.ga4.activeUsers.toLocaleString():'—'}</td><td>{row?.ga4?(row.ga4.newUsers??0).toLocaleString():'—'}</td><td>{row?.store?.playInstalls!=null?row.store.playInstalls.toLocaleString():'—'}</td><td>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():(a.appleAppId?'—':'iOS 미출시')}</td><td>{row?.ga4?row.ga4.sessions.toLocaleString():'—'}</td><td>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</td><td>{row?.admob?'$'+row.admob.ecpm.toFixed(2):'—'}</td><td>{row?.admob?(row.admob.ctr*100).toFixed(2)+'%':'—'}</td></tr>;})}</tbody></table></div>}
  <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>
  <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>
  <StoreLive apps={apps} app={current?.id} days={days}/>
@@ -113,7 +118,7 @@ export default function Dashboard({page}:{page:string}){
  {appsError&&<p className="note" role="status">{appsError}</p>}
  {!appsError&&!apps.length&&appsLoaded&&<div className="empty"><h2>시드 앱이 없습니다</h2><p>D1 마이그레이션 적용 후 새로고침하거나 앱을 추가하세요.</p></div>}
  <div className="appslist">{apps.map(a=>{const b=appBadges(a);return <div className="approw" key={a.id}><span className="appicon">{a.symbol||a.name.slice(0,1)}</span><div className="meta"><strong><Link href={`/apps/${a.id}`}>{a.name}</Link></strong><span>{a.id}{a.androidPkg?` · ${a.androidPkg}`:''}{a.appleAppId?` · ASC ${a.appleAppId}`:''}</span></div><div className="badges"><span className={'pill '+(b.ga4?'ok':'warn')}>GA4</span><span className={'pill '+(b.admob?'ok':'warn')}>AdMob</span><span className={'pill '+(b.play?'ok':'warn')}>Play</span><span className={'pill '+(b.asc?'ok':'warn')}>ASC</span><span className="pill">AF 메타</span></div><button type="button" className="refresh" onClick={()=>{setShowForm(false);setEditing(a);}}>수정</button></div>;})}</div>
- {!!missingAsc.length&&<p className="note">ASC 수치가 안 보이면 앱 수정에서 Apple ID(숫자)를 입력하세요. 대상: {missingAsc.map(a=>a.name).join(', ')}</p>}
+ {!!missingAsc.length&&<p className="note">iOS 출시 전이면 ASC/Apple ID는 나중에 넣으면 됩니다. 출시 후 앱 수정에서 Apple ID를 등록하세요.</p>}
  <GA4Setup/><AdmobSetup/><PlaySetup/><AscSetup/><StoreBatchPanel/>
  <div className="connectionlist">{[
  ['AppsFlyer','무료 Zero — Pull API 없음. 앱 ID만 보관합니다.','유료/트라이얼 전환 시 Aggregate 연동을 검토합니다.'],

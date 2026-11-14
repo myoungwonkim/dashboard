@@ -16,11 +16,22 @@ function dimensionFilter(q:Query){
  if(q.os!=='all')expressions.push(exact('operatingSystem',q.os==='android'?'Android':'iOS'));
  return {andGroup:{expressions}};
 }
-export function reportsBody(q:Query){
- const base={dateRanges:[{startDate:q.startDate||`${q.days}daysAgo`,endDate:q.endDate||'yesterday'}],dimensionFilter:dimensionFilter(q),keepEmptyRows:true};
+function reportBase(q:Query){
+ return {dateRanges:[{startDate:q.startDate||`${q.days}daysAgo`,endDate:q.endDate||'yesterday'}],dimensionFilter:dimensionFilter(q),keepEmptyRows:true};
+}
+/** Core totals + daily series only — used as fallback when deep P1 batch fails. */
+export function coreReportsBody(q:Query){
+ const base=reportBase(q);
  return {requests:[
   {...base,metrics:[{name:'activeUsers'},{name:'sessions'},{name:'eventCount'},{name:'newUsers'},{name:'engagedSessions'},{name:'engagementRate'},{name:'averageSessionDuration'},{name:'sessionsPerUser'}],limit:'1'},
-  {...base,dimensions:[{name:'date'}],metrics:[{name:'activeUsers'},{name:'newUsers'},{name:'sessions'}],orderBys:[{dimension:{dimensionName:'date'}}],limit:String(q.days)},
+  {...base,dimensions:[{name:'date'}],metrics:[{name:'activeUsers'},{name:'newUsers'},{name:'sessions'}],orderBys:[{dimension:{dimensionName:'date'}}],limit:String(Math.max(q.days,31))},
+ ]};
+}
+export function reportsBody(q:Query){
+ const base=reportBase(q);
+ const core=coreReportsBody(q).requests;
+ return {requests:[
+  ...core,
   {...base,dimensions:[{name:'firstUserSource'},{name:'firstUserMedium'}],metrics:[{name:'newUsers'}],orderBys:[{metric:{metricName:'newUsers'},desc:true}],limit:'10',keepEmptyRows:false},
   {...base,dimensions:[{name:'country'}],metrics:[{name:'activeUsers'},{name:'newUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'10',keepEmptyRows:false},
   {...base,dimensions:[{name:'appVersion'}],metrics:[{name:'activeUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'10',keepEmptyRows:false},
@@ -51,15 +62,26 @@ type Report={metricHeaders?:{name:string}[],dimensionHeaders?:{name:string}[],ro
 function metric(row:NonNullable<Report['rows']>[number]|undefined,index:number){if(!row)return 0;const value=row.metricValues?.[index]?.value;if(value===undefined||!/^\d+(\.\d+)?$/.test(value))throw new GAError('invalid_response');return Number(value);}
 function dim(row:NonNullable<Report['rows']>[number],index:number){const value=row.dimensionValues?.[index]?.value;if(typeof value!=='string'||!value)throw new GAError('invalid_response');return value;}
 function limited(...reports:Report[]){return !!reports.find(r=>r.metadata?.subjectToThresholding||r.metadata?.dataLossFromOtherRow||r.metadata?.samplingMetadatas?.length);}
+function emptyBreakdown(report:Report|undefined,dims:string[],metrics:string[]){
+ if(!report)return true;
+ const noRows=!(report.rows&&report.rows.length);
+ const dimOk=!report.dimensionHeaders||report.dimensionHeaders.map(d=>d.name).join(',')===dims.join(',');
+ const metOk=!report.metricHeaders||report.metricHeaders.map(m=>m.name).join(',')===metrics.join(',');
+ return noRows&&dimOk&&metOk;
+}
 export function parseReports(body:{reports?:Report[]},q:Query,propertyId:string,crash?:{reports?:Report[]}|null){
- const [total,daily,firstUser,country,version]=body.reports||[];
- if(!total||!daily||!firstUser||!country||!version)throw new GAError('invalid_response');
+ const reports=body.reports||[];
+ const [total,daily,firstUser,country,version]=reports;
+ if(!total||!daily)throw new GAError('invalid_response');
  if(total.metricHeaders?.map(m=>m.name).join(',')!=='activeUsers,sessions,eventCount,newUsers,engagedSessions,engagementRate,averageSessionDuration,sessionsPerUser')throw new GAError('invalid_response');
  if(daily.metricHeaders?.map(m=>m.name).join(',')!=='activeUsers,newUsers,sessions'||daily.dimensionHeaders?.[0]?.name!=='date')throw new GAError('invalid_response');
- if(firstUser.dimensionHeaders?.map(d=>d.name).join(',')!=='firstUserSource,firstUserMedium'||firstUser.metricHeaders?.[0]?.name!=='newUsers')throw new GAError('invalid_response');
- if(country.dimensionHeaders?.[0]?.name!=='country'||country.metricHeaders?.map(m=>m.name).join(',')!=='activeUsers,newUsers')throw new GAError('invalid_response');
- if(version.dimensionHeaders?.[0]?.name!=='appVersion'||version.metricHeaders?.[0]?.name!=='activeUsers')throw new GAError('invalid_response');
- if((total.rows?.length||0)>1||(daily.rowCount||0)>q.days)throw new GAError('invalid_response');
+ const deep=reports.length>=5;
+ if(deep){
+  if(!emptyBreakdown(firstUser,['firstUserSource','firstUserMedium'],['newUsers'])&&(firstUser!.dimensionHeaders?.map(d=>d.name).join(',')!=='firstUserSource,firstUserMedium'||firstUser!.metricHeaders?.[0]?.name!=='newUsers'))throw new GAError('invalid_response');
+  if(!emptyBreakdown(country,['country'],['activeUsers','newUsers'])&&(country!.dimensionHeaders?.[0]?.name!=='country'||country!.metricHeaders?.map(m=>m.name).join(',')!=='activeUsers,newUsers'))throw new GAError('invalid_response');
+  if(!emptyBreakdown(version,['appVersion'],['activeUsers'])&&(version!.dimensionHeaders?.[0]?.name!=='appVersion'||version!.metricHeaders?.[0]?.name!=='activeUsers'))throw new GAError('invalid_response');
+ }else if(reports.length!==2)throw new GAError('invalid_response');
+ if((total.rows?.length||0)>1)throw new GAError('invalid_response');
  const dailyRows=(daily.rows||[]).map(row=>{const date=dim(row,0);if(!/^\d{8}$/.test(date))throw new GAError('invalid_response');return {date,active:metric(row,0),newUsers:metric(row,1),sessions:metric(row,2)};});
  const timezone=total.metadata?.timeZone||daily.metadata?.timeZone||'속성 시간대';
  let crashAffectedUsers:number|null=null,crashFreeUsersRate:number|null=null;
@@ -76,11 +98,11 @@ export function parseReports(body:{reports?:Report[]},q:Query,propertyId:string,
   averageDau:Math.round(dailyRows.reduce((s,r)=>s+r.active,0)/q.days),
   crashAffectedUsers,crashFreeUsersRate,
   daily:dailyRows,
-  firstUser:(firstUser.rows||[]).map(row=>({source:dim(row,0),medium:dim(row,1),newUsers:metric(row,0)})),
-  countries:(country.rows||[]).map(row=>({country:dim(row,0),activeUsers:metric(row,0),newUsers:metric(row,1)})),
-  versions:(version.rows||[]).map(row=>({version:dim(row,0),activeUsers:metric(row,0)})),
+  firstUser:deep?(firstUser?.rows||[]).map(row=>({source:dim(row,0),medium:dim(row,1),newUsers:metric(row,0)})):[],
+  countries:deep?(country?.rows||[]).map(row=>({country:dim(row,0),activeUsers:metric(row,0),newUsers:metric(row,1)})):[],
+  versions:deep?(version?.rows||[]).map(row=>({version:dim(row,0),activeUsers:metric(row,0)})):[],
   timeZone:timezone,
-  limited:limited(total,daily,firstUser,country,version,...(crashReport?[crashReport]:[])),
+  limited:limited(total,daily,...(deep?[firstUser!,country!,version!]:[]),...(crashReport?[crashReport]:[])),
   fetchedAt:new Date().toISOString(),days:q.days,
  };
 }
@@ -99,7 +121,13 @@ export async function fetchReport(q:Query,token:string,propertyIdOrFetcher?:stri
  const run=typeof propertyIdOrFetcher==='function'?propertyIdOrFetcher:fetcher;
  const id=propertyId||(Object.hasOwn(properties,q.app)?properties[q.app as keyof typeof properties]:'');
  if(!id||!/^\d{6,12}$/.test(id))throw new GAError('invalid_query',400);
- const main=await runBatch(id,token,reportsBody(q),run);
+ let main:{reports?:Report[]};
+ try{main=await runBatch(id,token,reportsBody(q),run);}
+ catch(error){
+  // Deep P1 dimensions can fail on some properties; still show core DAU/sessions.
+  if(!(error instanceof GAError)||error.code==='permission_denied'||error.code==='api_disabled'||error.code==='authentication_failed'||error.code==='scope_insufficient')throw error;
+  main=await runBatch(id,token,coreReportsBody(q),run);
+ }
  let crash: {reports?:Report[]}|null=null;
  try{crash=await runBatch(id,token,crashBody(q),run);}catch{crash=null;}
  return parseReports(main,q,id,crash);

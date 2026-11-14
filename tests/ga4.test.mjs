@@ -51,3 +51,22 @@ test('crash report failure still returns main metrics',async()=>{
  assert.equal(result.crashAffectedUsers,null);
  assert.ok(n>=2);
 });
+test('deep batch failure falls back to core totals and daily',async()=>{
+ const coreOnly={reports:[reports.reports[0],reports.reports[1]]};
+ let deepTried=false;
+ const result=await fetchReport(query,'tok',async(_url,options)=>{
+  const body=JSON.parse(options.body);
+  if(body.requests.length===5){deepTried=true;return new Response('nope',{status:500});}
+  if(body.requests.length===2)return Response.json(coreOnly);
+  return new Response('nope',{status:500});
+ });
+ assert.equal(deepTried,true);
+ assert.equal(result.activeUsers,10);
+ assert.equal(result.firstUser.length,0);
+});
+test('core-only report payload parses without breakdown tables',()=>{
+ const core={reports:[reports.reports[0],reports.reports[1]]};
+ const data=parseReports(core,query,'550050295');
+ assert.equal(data.sessions,40);
+ assert.deepEqual(data.countries,[]);
+});
