@@ -102,7 +102,7 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{ap
   if(ret&&ret.rows.length){
    const offs=SHOW_OFFSETS.filter(d=>d<=ret.summary.endOffset);
    const period=retentionTotals(ret.rows,offs);
-   return <div className="panel panel-wide" style={{marginTop:20}} key={a.id+'-ret'}><div className="sectiontitle"><h2><AppMark id={a.id} name={a.name}/> · 리텐션</h2><span>D0–D{ret.summary.endOffset} · {ret.summary.cohorts}코호트</span></div>
+   return <div className="panel" style={{marginTop:20}} key={a.id+'-ret'}><div className="sectiontitle"><h2><AppMark id={a.id} name={a.name}/> · 리텐션</h2><span>D0–D{ret.summary.endOffset} · {ret.summary.cohorts}코호트</span></div>
     <p className="note">행=그날에 처음 연 사용자 · 열 Dn=n일 뒤 활성 비율 · 상단 종합=코호트 규모 가중 평균. D1 {fmtRate(ret.summary.d1)} · D7 {fmtRate(ret.summary.d7)} · D14 {fmtRate(ret.summary.d14)} · D30 {fmtRate(ret.summary.d30)}{r.data.retentionNote?` · ${r.data.retentionNote}`:''}</p>
     <div className="tablewrap retentionwrap"><table className="retention dense"><thead><tr><th>첫 세션</th><th>규모</th>{offs.map(d=><th key={d} title={d===0?'당일':d===1?'다음날':`${d}일 후`}>D{d}</th>)}</tr></thead>
     <tbody>
@@ -113,11 +113,11 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{ap
   }
   return <p className="note" key={a.id+'-ret-miss'}><AppMark id={a.id} name={a.name}/>: {r.data.retentionNote||'리텐션을 불러오지 못했습니다.'}</p>;
  })}
- {detailData&&!loading&&<>
- {!!detailData.firstUser?.length&&<div className="panel panel-narrow" style={{marginTop:20}}><div className="sectiontitle"><h2><AppMark id={app!} name={targets.find(t=>t.id===app)?.name||app!}/> · 유입</h2><span>Top 10</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>소스 / 매체</th><th>신규</th></tr></thead><tbody>{detailData.firstUser.map(r=><tr key={r.source+'/'+r.medium}><td className="cell-text">{r.source} / {r.medium}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
- {!!detailData.countries?.length&&<div className="panel panel-narrow" style={{marginTop:20}}><div className="sectiontitle"><h2><AppMark id={app!} name={targets.find(t=>t.id===app)?.name||app!}/> · 국가</h2><span>활성 · 신규</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>국가</th><th>활성</th><th>신규</th></tr></thead><tbody>{detailData.countries.map(r=><tr key={r.country}><td className="cell-text">{r.country}</td><td>{r.activeUsers.toLocaleString()}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
- {!!detailData.versions?.length&&<div className="panel panel-narrow" style={{marginTop:20}}><div className="sectiontitle"><h2><AppMark id={app!} name={targets.find(t=>t.id===app)?.name||app!}/> · 앱 버전</h2><span>활성</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>버전</th><th>활성</th></tr></thead><tbody>{detailData.versions.map(r=><tr key={r.version}><td className="cell-text">{r.version}</td><td>{r.activeUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
- </>}
+ {detailData&&!loading&&!!(detailData.firstUser?.length||detailData.countries?.length||detailData.versions?.length)&&<div className={'detail-grid'+(detailData.firstUser?.length&&detailData.countries?.length&&detailData.versions?.length?' cols-3':'')}>
+ {!!detailData.firstUser?.length&&<div className="panel"><div className="sectiontitle"><h2>유입</h2><span>Top 10</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>소스 / 매체</th><th>신규</th></tr></thead><tbody>{detailData.firstUser.map(r=><tr key={r.source+'/'+r.medium}><td className="cell-text">{r.source} / {r.medium}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
+ {!!detailData.countries?.length&&<div className="panel"><div className="sectiontitle"><h2>국가</h2><span>활성 · 신규</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>국가</th><th>활성</th><th>신규</th></tr></thead><tbody>{detailData.countries.map(r=><tr key={r.country}><td className="cell-text">{r.country}</td><td>{r.activeUsers.toLocaleString()}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
+ {!!detailData.versions?.length&&<div className="panel"><div className="sectiontitle"><h2>앱 버전</h2><span>활성</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>버전</th><th>활성</th></tr></thead><tbody>{detailData.versions.map(r=><tr key={r.version}><td className="cell-text">{r.version}</td><td>{r.activeUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
+ </div>}
  </>}
  <p className="note">Dn 리텐션은 GA4 firstSessionDate 코호트(그날 첫 세션 유저) 기준입니다. Crash-free는 Crashlytics 연동 속성에만 표시됩니다.</p></section>;
 }

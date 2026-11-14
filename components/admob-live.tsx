@@ -98,14 +98,18 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os}:{
   const units=r.data.adUnits||[];
   const formats=r.data.formats||[];
   if(!units.length&&!formats.length&&!(app&&r.data.countries?.length))return null;
+  const showFormats=!!formats.length&&(app||targets.length===1);
+  const showCountries=!!(app&&r.data.countries?.length);
   return <div key={a.id+'-break'} style={{marginTop:20}}>
-   {!!units.length&&<div className="panel panel-mid"><div className="sectiontitle"><h2><AppMark id={a.id} name={a.name}/> · 광고 유닛별 수익</h2><span>핵심 지표</span></div>
+   {!!units.length&&<div className="panel"><div className="sectiontitle"><h2><AppMark id={a.id} name={a.name}/> · 광고 유닛별 수익</h2><span>핵심 지표</span></div>
     <p className="note">유저당 = 유닛 수익 ÷ GA4 기간 활성({active!=null?active.toLocaleString():'—'}명). 노출·CTR은 행에 마우스를 올리면 보입니다.</p>
     <div className="tablewrap"><table className="dense"><thead><tr><th>이름</th><th>타입</th><th>수익</th><th>유저당</th><th>eCPM</th></tr></thead>
     <tbody>{units.map(u=><tr key={u.adUnitId+'/'+u.format} title={`${u.adUnitId} · 노출 ${u.impressions.toLocaleString()} · CTR ${(u.ctr*100).toFixed(2)}%`}><td className="cell-text">{u.name===u.adUnitId?<span style={{color:'#888'}}>이름 없음</span>:<strong>{u.name}</strong>}</td><td>{u.formatLabel||u.format}</td><td>${u.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(u.revenue,active))}</td><td>${u.ecpm.toFixed(2)}</td></tr>)}</tbody></table></div>
    </div>}
-   {!!formats.length&&(app||targets.length===1)&&<div className="panel panel-narrow" style={{marginTop:units.length?16:0}}><div className="sectiontitle"><h2><AppMark id={a.id} name={a.name}/> · 광고 타입</h2><span>수익 · 유저당</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>타입</th><th>수익</th><th>유저당</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{formats.map(f=><tr key={f.format} title={`노출 ${f.impressions.toLocaleString()} · 요청 ${f.adRequests.toLocaleString()} · 매칭 ${f.matchedRequests.toLocaleString()}`}><td>{formatLabel(f.format)}</td><td>${f.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(f.revenue,active))}</td><td>${f.ecpm.toFixed(2)}</td><td>{(f.ctr*100).toFixed(2)}%</td></tr>)}</tbody></table></div></div>}
-   {app&&!!r.data.countries?.length&&<div className="panel panel-narrow" style={{marginTop:16}}><div className="sectiontitle"><h2><AppMark id={a.id} name={a.name}/> · 국가별 수익</h2><span>Top</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>국가</th><th>수익</th><th>유저당</th><th>eCPM</th></tr></thead><tbody>{r.data.countries.slice(0,12).map(c=><tr key={c.country} title={`노출 ${c.impressions.toLocaleString()} · CTR ${(c.ctr*100).toFixed(2)}%`}><td className="cell-text">{c.country}</td><td>${c.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(c.revenue,active))}</td><td>${c.ecpm.toFixed(2)}</td></tr>)}</tbody></table></div></div>}
+   {(showFormats||showCountries)&&<div className="detail-grid" style={{marginTop:units.length?16:0}}>
+    {showFormats&&<div className="panel"><div className="sectiontitle"><h2>광고 타입</h2><span>수익 · 유저당</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>타입</th><th>수익</th><th>유저당</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{formats.map(f=><tr key={f.format} title={`노출 ${f.impressions.toLocaleString()} · 요청 ${f.adRequests.toLocaleString()} · 매칭 ${f.matchedRequests.toLocaleString()}`}><td>{formatLabel(f.format)}</td><td>${f.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(f.revenue,active))}</td><td>${f.ecpm.toFixed(2)}</td><td>{(f.ctr*100).toFixed(2)}%</td></tr>)}</tbody></table></div></div>}
+    {showCountries&&<div className="panel"><div className="sectiontitle"><h2>국가별 수익</h2><span>Top</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>국가</th><th>수익</th><th>유저당</th><th>eCPM</th></tr></thead><tbody>{r.data.countries!.slice(0,12).map(c=><tr key={c.country} title={`노출 ${c.impressions.toLocaleString()} · CTR ${(c.ctr*100).toFixed(2)}%`}><td className="cell-text">{c.country}</td><td>${c.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(c.revenue,active))}</td><td>${c.ecpm.toFixed(2)}</td></tr>)}</tbody></table></div></div>}
+   </div>}
   </div>;
  })}
  </section>;

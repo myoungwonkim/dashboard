@@ -13,7 +13,7 @@ type PlayData={packageName:string;installs:number|null;uninstalls?:number|null;r
 type AscData={appleAppId:string;name:string;bundleId:string;downloads:number|null;reviews?:{id:string;rating:number;title:string;text:string;author:string;at:string|null}[];daily?:{date:string;downloads:number}[];spike?:Spike|null;perf?:Perf|null;note?:string;fetchedAt:string};
 type Result<T>={status:'success';data:T}|{status:'error';message:string;code?:string};
 function SpikeNote({spike}:{spike?:Spike|null}){if(!spike)return null;return <p className="note">급변 {spike.direction==='up'?'↑':'↓'} {spike.date}: {spike.value.toLocaleString()} (최근 평균 {Math.round(spike.baseline).toLocaleString()}{spike.ratio!=null?` · ×${spike.ratio.toFixed(1)}`:''})</p>;}
-function DimTable({title,rows,metric}:{title:string;rows?:Dim[];metric:'installs'|'visitors'}){if(!rows?.length)return null;return <div className="panel panel-narrow" style={{marginTop:16}}><div className="sectiontitle"><h2>{title}</h2><span>Top</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>항목</th><th>{metric==='installs'?'설치':'방문'}</th><th>전환</th><th>평점</th></tr></thead><tbody>{rows.slice(0,12).map(r=><tr key={r.key}><td className="cell-text">{r.key}</td><td>{(metric==='installs'?r.installs:r.visitors).toLocaleString()}</td><td>{r.conversions?r.conversions.toLocaleString():'—'}</td><td>{r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'}</td></tr>)}</tbody></table></div></div>;}
+function DimTable({title,rows,metric}:{title:string;rows?:Dim[];metric:'installs'|'visitors'}){if(!rows?.length)return null;return <div className="panel"><div className="sectiontitle"><h2>{title}</h2><span>Top</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>항목</th><th>{metric==='installs'?'설치':'방문'}</th><th>전환</th><th>평점</th></tr></thead><tbody>{rows.slice(0,12).map(r=><tr key={r.key}><td className="cell-text">{r.key}</td><td>{(metric==='installs'?r.installs:r.visitors).toLocaleString()}</td><td>{r.conversions?r.conversions.toLocaleString():'—'}</td><td>{r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'}</td></tr>)}</tbody></table></div></div>;}
 export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRecord[];app?:string;days:number;startDate?:string;endDate?:string}){
  const [play,setPlay]=useState<Record<string,Result<PlayData>>>({});
  const [asc,setAsc]=useState<Record<string,Result<AscData>>>({});
@@ -86,12 +86,12 @@ export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRec
    {!playTargets.length&&!ascTargets.length&&<p className="note">스토어 ID(패키지·Apple App ID)가 등록된 앱이 없습니다.</p>}
   </div>
   {!!([...playCharts,...ascCharts].length)&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>스토어</span></div><TrendChart series={[...playCharts,...ascCharts]}/></div>}
-  {detailPlay?.status==='success'&&!loading&&<>
-   <DimTable title={`${targetsName(app,apps)} · Play 국가별 설치`} rows={detailPlay.data.countries} metric="installs"/>
-   <DimTable title={`${targetsName(app,apps)} · Play 앱 버전`} rows={detailPlay.data.versions} metric="installs"/>
-   <DimTable title={`${targetsName(app,apps)} · Play 트래픽 소스`} rows={detailPlay.data.traffic} metric="visitors"/>
-  </>}
-  {detailAsc?.status==='success'&&detailAsc.data.perf&&!loading&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>{targetsName(app,apps)} · App Store 전환</h2><span>Analytics</span></div><p className="note">노출 {detailAsc.data.perf.visitors.toLocaleString()} · 획득 {detailAsc.data.perf.acquisitions.toLocaleString()} · 전환 {detailAsc.data.perf.conversionRate!=null?(detailAsc.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</p></div>}
+  {detailPlay?.status==='success'&&!loading&&!!(detailPlay.data.countries?.length||detailPlay.data.versions?.length||detailPlay.data.traffic?.length)&&<div className={'detail-grid'+(detailPlay.data.countries?.length&&detailPlay.data.versions?.length&&detailPlay.data.traffic?.length?' cols-3':'')} style={{marginTop:20}}>
+   <DimTable title="Play 국가별 설치" rows={detailPlay.data.countries} metric="installs"/>
+   <DimTable title="Play 앱 버전" rows={detailPlay.data.versions} metric="installs"/>
+   <DimTable title="Play 트래픽 소스" rows={detailPlay.data.traffic} metric="visitors"/>
+  </div>}
+  {detailAsc?.status==='success'&&detailAsc.data.perf&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>App Store 전환</h2><span>Analytics</span></div><p className="note">노출 {detailAsc.data.perf.visitors.toLocaleString()} · 획득 {detailAsc.data.perf.acquisitions.toLocaleString()} · 전환 {detailAsc.data.perf.conversionRate!=null?(detailAsc.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</p></div>}
  </section>;
 }
 function targetsName(appId:string|undefined,apps:AppRecord[]){return apps.find(a=>a.id===appId)?.name||appId||'앱';}

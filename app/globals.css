@@ -121,16 +121,22 @@
 table.dense{white-space:normal}
 table.dense th,table.dense td{padding:8px 10px;font-size:12px;vertical-align:top}
 table.dense td.cell-text,table.dense th.cell-text,.cell-text{text-align:left;white-space:normal;overflow-wrap:anywhere;max-width:220px;line-height:1.35}
-.panel-narrow{max-width:560px}
-.panel-mid{max-width:720px}
-.panel-wide{max-width:880px}
-/* App detail: stop KPI cards and panels from stretching across ultra-wide viewports */
-.appreport main{max-width:960px}
-.appreport .livegrid{grid-template-columns:minmax(0,560px);justify-content:start}
-.appreport .livecard{max-width:560px}
-.appreport .ga4live>.panel,.appreport .ga4live .panel-wide{max-width:880px}
+/* Related breakdown tables share one grid */
+.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:20px;align-items:start}
+.detail-grid .panel{margin-top:0;height:100%}
+.detail-grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:720px){.detail-grid,.detail-grid.cols-3{grid-template-columns:1fr}}
+/* App detail: one shared column width for cards, charts, and panels */
+.appreport main{max-width:880px}
+.appreport .livegrid{grid-template-columns:1fr;width:100%}
+.appreport .livecard,.appreport .ga4live .panel,.appreport .panel{width:100%;max-width:none;box-sizing:border-box}
+.appreport .livecard dl{grid-template-columns:repeat(3,minmax(0,1fr))}
 .appreport .tablewrap th,.appreport .tablewrap td{padding:10px 10px}
 .appreport .tablewrap table.dense{white-space:normal}
+.appreport .ga4live{display:flex;flex-direction:column;gap:0}
+.appreport .ga4live>.panel{margin-top:20px}
+@media(max-width:720px){.appreport .livecard dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.appreport .livecard dl{grid-template-columns:1fr}}
 /* Overview compare: sticky app column, denser cells */
 .comparewrap{overflow:auto;max-width:100%}
 .comparewrap table{font-size:12px;width:100%}
