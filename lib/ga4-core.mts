@@ -1,6 +1,7 @@
 import {queryDates} from './date-range.mts';
 import {SLUG_RE} from './apps.ts';
 import {isCountryFilter} from './countries.mts';
+import {cohortReportBody,parseCohortReport,type RetentionData} from './ga4-cohort.mts';
 /** @deprecated Kept for tests/fixtures; live lookups use the apps registry. */
 export const properties = {bazi:'550050295',sudoku:'558243778'} as const;
 export type Query={app:string,days:number,startDate?:string,endDate?:string,country:string,os:string};
@@ -162,14 +163,15 @@ export async function fetchReport(q:Query,token:string,propertyIdOrFetcher?:stri
  // Prefer deep → core → minimal. Retry on transport OR parse (invalid_response) failures.
  const attempts=[reportsBody(q),coreReportsBody(q),minimalReportsBody(q)];
  let last:unknown;
+ let base:Awaited<ReturnType<typeof parseOrThrow>>|null=null;
  for(let i=0;i<attempts.length;i++){
   try{
    const main=await load(attempts[i]);
    // Deep payload may parse-fail; try slicing to core reports before next network call.
-   try{return await parseOrThrow(main,crash);}
+   try{base=await parseOrThrow(main,crash);break;}
    catch(parseError){
     if(i===0&&(main.reports?.length||0)>=2){
-     try{return await parseOrThrow({reports:main.reports!.slice(0,2)},crash);}catch{/* continue */}
+     try{base=await parseOrThrow({reports:main.reports!.slice(0,2)},crash);break;}catch{/* continue */}
     }
     throw parseError;
    }
@@ -178,7 +180,14 @@ export async function fetchReport(q:Query,token:string,propertyIdOrFetcher?:stri
    if(isHardAuthError(error))throw error;
   }
  }
- throw last instanceof GAError?last:new GAError('invalid_response');
+ if(!base)throw last instanceof GAError?last:new GAError('invalid_response');
+ // Daily cohort retention — soft-fail so main KPIs still return.
+ let retention:RetentionData|null=null;
+ try{
+  const cohort=await run(`https://analyticsdata.googleapis.com/v1beta/properties/${id}:runReport`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(cohortReportBody(q)),signal:AbortSignal.timeout(25000)});
+  if(cohort.ok)retention=parseCohortReport(await cohort.json());
+ }catch{retention=null;}
+ return {...base,retention};
 }
 
 export type PropertyCheck={app:string;propertyId:string;ok:boolean;code:string};

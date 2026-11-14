@@ -18,6 +18,7 @@ import AscSetup from './asc-setup';
 import StoreLive from './store-live';
 import StoreBatchPanel from './store-batch-panel';
 import {admobPublisherId} from '@/lib/admob-config';
+import {adArpu,fmtUsd} from '@/lib/arpu.mts';
 const tasks=[
 ['화면 구조와 디자인 확정','완료','B 앱 비교형 메인 / C 서비스별 분석형 앱 상세. 흑백·회색 중심.'],
 ['메인과 앱별 상세 페이지','완료','앱 레지스트리 기반 동적 주소, 상단 풀다운으로 이동.'],
@@ -77,14 +78,14 @@ export default function Dashboard({page}:{page:string}){
  const overviewGa4Errors=apps.map(a=>compare[a.id]?.ga4Error?`${a.name}: ${compare[a.id]!.ga4Error}`:'').filter(Boolean);
  const playInstallGap=apps.some(a=>a.androidPkg&&compare[a.id]?.store&&compare[a.id]!.store!.playInstalls==null);
  const totals=useMemo(()=>{
-  let dau=0,play=0,rev=0,dauN=0,playN=0,revN=0;
+  let dau=0,play=0,rev=0,users=0,dauN=0,playN=0,revN=0,userN=0;
   for(const a of apps){
    const row=compare[a.id];
-   if(row?.ga4){dau+=row.ga4.averageDau;dauN++;}
+   if(row?.ga4){dau+=row.ga4.averageDau;dauN++;users+=row.ga4.activeUsers;userN++;}
    if(row?.store?.playInstalls!=null){play+=row.store.playInstalls;playN++;}
    if(row?.admob){rev+=row.admob.revenue;revN++;}
   }
-  return {dau,play,rev,dauN,playN,revN};
+  return {dau,play,rev,users,dauN,playN,revN,userN,arpu:adArpu(revN&&userN?rev:null,userN?users:null)};
  },[apps,compare]);
 
  useEffect(()=>{
@@ -175,11 +176,12 @@ export default function Dashboard({page}:{page:string}){
    <div className="metric"><span>평균 DAU 합</span><strong>{totals.dauN?Math.round(totals.dau).toLocaleString():'—'}</strong><small>GA4 · 앱 {totals.dauN}/{apps.length}</small></div>
    <div className="metric"><span>Play 설치 합</span><strong>{totals.playN?totals.play.toLocaleString():'—'}</strong><small>{playSetup?.gcsBucket?'GCS/배치':'버킷 미등록'} · 앱 {totals.playN}/{apps.filter(a=>a.androidPkg).length}</small></div>
    <div className="metric"><span>광고 수익 합</span><strong>{totals.revN?'$'+totals.rev.toFixed(2):'—'}</strong><small>AdMob · 앱 {totals.revN}/{apps.length}</small></div>
+   <div className="metric"><span>유저당 광고 수익</span><strong>{fmtUsd(totals.arpu)}</strong><small>AdMob÷GA4 활성 · 앱 합산</small></div>
   </div>
   <div className="sectiontitle"><h2>앱 비교</h2><span>같은 필터 · 행 클릭 시 상세</span></div>
  </>}
  {page==='overview'&&appsLoaded&&!apps.length&&!appsError&&<div className="empty"><h2>등록된 앱이 없습니다</h2><p>Connections에서 앱을 추가하세요.</p><p className="note"><Link href="/connections">데이터 연결로 이동</Link></p></div>}
- {page==='overview'&&!!apps.length&&<div className="tablewrap"><table><thead><tr><th>앱</th><th>DAU</th><th>Play 설치</th><th>수익</th><th>활성</th><th>신규</th><th>ASC</th><th>세션</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{apps.map(a=>{const row=compare[a.id];const ascPending=!!a.appleAppId&&!!row?.store&&row.store.ascDownloads==null;return <tr key={a.id} style={{cursor:'pointer'}} onClick={()=>router.push(`/apps/${a.id}`)}><td><div className="applink"><AppIcon app={a}/><span><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}<small>{a.androidPkg||a.id}{row?.store?.playSource?` · ${row.store.playSource}`:''}{row?.ga4Error?' · GA4 오류':''}</small></span></div></td><td>{row?.ga4?row.ga4.averageDau.toLocaleString():'—'}</td><td>{playCell(a,row)}</td><td>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</td><td>{row?.ga4?row.ga4.activeUsers.toLocaleString():'—'}</td><td>{row?.ga4?(row.ga4.newUsers??0).toLocaleString():'—'}</td><td>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():ascPending?<span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">배치 대기</Link></span>:(a.appleAppId?'—':'iOS 미출시')}</td><td>{row?.ga4?row.ga4.sessions.toLocaleString():'—'}</td><td>{row?.admob?'$'+row.admob.ecpm.toFixed(2):'—'}</td><td>{row?.admob?(row.admob.ctr*100).toFixed(2)+'%':'—'}</td></tr>;})}</tbody></table></div>}
+ {page==='overview'&&!!apps.length&&<div className="tablewrap"><table><thead><tr><th>앱</th><th>DAU</th><th>Play 설치</th><th>수익</th><th>유저당</th><th>활성</th><th>신규</th><th>ASC</th><th>세션</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{apps.map(a=>{const row=compare[a.id];const ascPending=!!a.appleAppId&&!!row?.store&&row.store.ascDownloads==null;const arpu=adArpu(row?.admob?.revenue,row?.ga4?.activeUsers);return <tr key={a.id} style={{cursor:'pointer'}} onClick={()=>router.push(`/apps/${a.id}`)}><td><div className="applink"><AppIcon app={a}/><span><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}<small>{a.androidPkg||a.id}{row?.store?.playSource?` · ${row.store.playSource}`:''}{row?.ga4Error?' · GA4 오류':''}</small></span></div></td><td>{row?.ga4?row.ga4.averageDau.toLocaleString():'—'}</td><td>{playCell(a,row)}</td><td>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</td><td>{fmtUsd(arpu)}</td><td>{row?.ga4?row.ga4.activeUsers.toLocaleString():'—'}</td><td>{row?.ga4?(row.ga4.newUsers??0).toLocaleString():'—'}</td><td>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():ascPending?<span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">배치 대기</Link></span>:(a.appleAppId?'—':'iOS 미출시')}</td><td>{row?.ga4?row.ga4.sessions.toLocaleString():'—'}</td><td>{row?.admob?'$'+row.admob.ecpm.toFixed(2):'—'}</td><td>{row?.admob?(row.admob.ctr*100).toFixed(2)+'%':'—'}</td></tr>;})}</tbody></table></div>}
 
  {(!!current||(page==='overview'&&showDeep))&&<>
   <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>

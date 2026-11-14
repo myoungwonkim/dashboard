@@ -74,3 +74,7 @@
 .form input{border:1px solid #ddd;border-radius:7px;padding:10px;font:inherit}
 .formerror{color:#666;font-size:13px}
 @media(max-width:720px){.wizard{grid-template-columns:1fr}.steps{border:0;display:flex;flex-wrap:wrap;gap:4px;padding:0}.step{margin:0}}
+
+.retentionwrap{overflow-x:auto}
+.retention th,.retention td{text-align:right;font-variant-numeric:tabular-nums;font-size:12px;padding:6px 8px}
+.retention th:first-child,.retention td:first-child,.retention th:nth-child(2),.retention td:nth-child(2){text-align:left}
