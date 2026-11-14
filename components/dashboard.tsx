@@ -17,6 +17,7 @@ import PlaySetup from './play-setup';
 import AscSetup from './asc-setup';
 import StoreLive from './store-live';
 import StoreBatchPanel from './store-batch-panel';
+import PagePicker,{WorkspaceNav} from './page-picker';
 import {admobPublisherId} from '@/lib/admob-config';
 import {adArpu,fmtUsd} from '@/lib/arpu.mts';
 const tasks=[
@@ -72,7 +73,7 @@ export default function Dashboard({page}:{page:string}){
  const title=current?.name||({overview:'서비스 현황',progress:'진행상황',connections:'데이터 연결'} as Record<string,string>)[page]||page;
  const codeDone=11+Number(ga4Verified);
  const doneBase=codeDone+Number(admobVerified);
- const pageOptions=useMemo(()=>[['overview','서비스 현황'],...apps.map(a=>[a.id,a.name] as [string,string]),['progress','진행상황'],['connections','데이터 연결']],[apps]);
+ const progressLabel=`진행상황 ${doneBase}/13`;
  const missingAsc=apps.filter(a=>!a.appleAppId);
  const needsSetup=!ga4Verified||!admobVerified||apps.some(a=>!a.androidPkg)||!playSetup?.gcsBucket;
  const overviewGa4Errors=apps.map(a=>compare[a.id]?.ga4Error?`${a.name}: ${compare[a.id]!.ga4Error}`:'').filter(Boolean);
@@ -161,7 +162,7 @@ export default function Dashboard({page}:{page:string}){
 
  return <div className="shell">
  <button type="button" className="float-refresh" disabled={refreshing} onClick={refreshPage} aria-label="데이터 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button>
- <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><select className="pagepicker" aria-label="페이지 및 앱 선택" value={page==='overview'||page==='progress'||page==='connections'?page:(current?page:'overview')} onChange={e=>{const v=e.target.value;router.push(v==='overview'?'/':v==='progress'?'/progress':v==='connections'?'/connections':`/apps/${v}`);}}>{pageOptions.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div><div className="headeractions"><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'필수 연결을 위에서부터 순서대로 완료하세요.'}</p></div><div className="titleactions">{page==='connections'&&!showForm&&!editing&&<button type="button" className="setupbutton" onClick={()=>{setEditing(null);setShowForm(true);}}>앱 추가</button>}</div></div>
+ <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'필수 연결을 위에서부터 순서대로 완료하세요.'}</p></div><div className="titleactions">{page==='connections'&&!showForm&&!editing&&<button type="button" className="setupbutton" onClick={()=>{setEditing(null);setShowForm(true);}}>앱 추가</button>}</div></div>
  {appsError&&<div className="notice" role="status"><span className="dot"/>{appsError}<button type="button" className="refresh" onClick={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}>다시 시도</button></div>}
  {report&&<><div className="notice"><span className="dot"/>표시 숫자는 실조회입니다. AppsFlyer Zero는 API 없음.<Link href="/connections">연결 <ArrowUpRight size={13}/></Link></div>
  {page==='overview'&&needsSetup&&appsLoaded&&!appsError&&<div className="notice setuphint"><span className="dot"/>미연결 항목이 있으면 — 로 나옵니다. Play 설치가 비면 GCS 버킷·배치를 확인하세요. iOS/ASC는 출시 전 생략 가능.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
@@ -222,5 +223,5 @@ export default function Dashboard({page}:{page:string}){
  ].map(([name,first,second])=><section className="connection" key={name}><div className="sectiontitle"><h2>{name}</h2><span className="status">안내</span></div><p>{first}</p><p>{second}</p></section>)}</div>
  <section className="projectids"><h2>AdMob 게시자</h2><p className="note">게시자 ID: {admobPublisherId} · 앱별 ca-app-pub ID는 앱 행에 저장</p></section>
  </>}
- <nav className="utilitylinks" aria-label="대시보드 관리"><Link href="/progress">진행상황 {doneBase}/13</Link><Link href="/connections">데이터 연결</Link></nav></main></div></div>;
+ <WorkspaceNav page={page} apps={apps} progressLabel={progressLabel}/></main></div></div>;
 }
