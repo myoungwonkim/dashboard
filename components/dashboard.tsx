@@ -51,7 +51,7 @@ export default function Dashboard({page}:{page:string}){
  const [wideTable,setWideTable]=useState(false);
  const [showDeep,setShowDeep]=useState(false);
  const [refreshing,setRefreshing]=useState(false);
- type CompareRow={ga4?:Ga4Row;admob?:AdmobRow;store?:StoreRow;ga4Error?:string;admobError?:string;playError?:string};
+ type CompareRow={ga4?:Ga4Row;admob?:AdmobRow;store?:StoreRow;ga4Error?:string;admobError?:string;playError?:string;playCode?:string};
  const [compare,setCompare]=useState<Record<string,CompareRow>>({});
  useEffect(()=>{
   setAppsError('');
@@ -103,12 +103,12 @@ export default function Dashboard({page}:{page:string}){
    if(a.androidPkg){
     try{
      const res=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate}),signal:controller.signal});
-     const body=await res.json() as {status:string;data?:{installs:number|null;installsSource?:string|null;note?:string};message?:string};
+     const body=await res.json() as {status:string;data?:{installs:number|null;installsSource?:string|null;note?:string};message?:string;code?:string};
      if(res.ok&&body.status==='success'){
       next.store!.playInstalls=body.data?.installs??null;
       next.store!.playSource=body.data?.installsSource??null;
       next.store!.playNote=body.data?.note??null;
-     }else next.playError=body.message||'Play 조회 실패';
+     }else{next.playError=body.message||'Play 조회 실패';next.playCode=body.code;}
     }catch{next.playError='Play 서버 연결 실패';}
    }
    if(a.appleAppId){
@@ -130,14 +130,26 @@ export default function Dashboard({page}:{page:string}){
 
  function playCell(a:AppRecord,row?:CompareRow){
   if(!a.androidPkg)return '—';
-  if(row?.playError)return <span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">연결 오류</Link></span>;
+  if(row?.playError){
+   const label=row.playCode==='not_configured'||!playSetup?.configured?'키 필요'
+    :row.playCode==='permission_denied'?'권한 필요'
+    :row.playCode==='authentication_failed'?'인증 실패'
+    :!playSetup?.gcsBucket?'버킷·연결 확인'
+    :'연결 오류';
+   return <span className="batchwait" title={row.playError} onClick={e=>e.stopPropagation()}><Link href="/connections">{label}</Link></span>;
+  }
   if(row?.store?.playInstalls!=null)return row.store.playInstalls.toLocaleString();
   if(row?.store&&row.store.playInstalls==null){
    const reason=!playSetup?.configured?'키 필요':!playSetup?.gcsBucket?'버킷 필요':'배치/CSV 대기';
-   return <span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">{reason}</Link></span>;
+   return <span className="batchwait" title={row.store.playNote||undefined} onClick={e=>e.stopPropagation()}><Link href="/connections">{reason}</Link></span>;
   }
   return '…';
  }
+ const overviewPlayErrors=apps.map(a=>{
+  const row=compare[a.id];
+  if(!a.androidPkg||!row?.playError)return '';
+  return `${a.name}: ${row.playError}`;
+ }).filter(Boolean);
 
  const checklist=[
   {ok:ga4Verified,label:'GA4 서비스 계정 · 속성 조회',href:'#ga4'},
@@ -155,6 +167,8 @@ export default function Dashboard({page}:{page:string}){
  {page==='overview'&&playInstallGap&&!needsSetup&&<div className="notice setuphint" role="status"><span className="dot"/>Play 설치가 아직 비어 있습니다. Connections → GCS 버킷 → 스토어 배치를 실행한 뒤 새로고침하세요.</div>}
  {os==='ios'&&<div className="notice setuphint" role="status"><span className="dot"/>OS 필터가 iOS입니다. iOS 미출시면 수치가 0 또는 — 로 나옵니다. Android 또는 전체 OS로 바꿔 보세요.</div>}
  {!!overviewGa4Errors.length&&<div className="notice setuphint" role="status"><span className="dot"/>GA4 조회 오류 — {overviewGa4Errors.join(' · ')}</div>}
+ {!!overviewPlayErrors.length&&<div className="notice setuphint" role="status"><span className="dot"/>Play 조회 오류 — {overviewPlayErrors.join(' · ')}{!playSetup?.gcsBucket?' · GCS 버킷을 Connections에 등록하세요.':''}<Link href="/connections">연결 <ArrowUpRight size={13}/></Link></div>}
+ {!overviewPlayErrors.length&&page==='overview'&&playSetup&&!playSetup.gcsBucket&&!!apps.some(a=>a.androidPkg)&&<div className="notice setuphint" role="status"><span className="dot"/>Play 설치는 GCS 버킷이 필요합니다. Connections → Google Play 연결에서 <code>pubsite_prod_rev_…</code> 버킷을 저장한 뒤 스토어 배치를 실행하세요.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
  <div className="filterbar"><DateRangePicker value={dateRange} onChange={setDateRange}/><label>국가<select aria-label="국가" value={country} onChange={e=>setCountry(e.target.value)}>{COUNTRY_OPTIONS.map(o=><option key={o.code} value={o.code}>{o.label}</option>)}</select></label><label>OS<select aria-label="OS" value={os} onChange={e=>setOs(e.target.value)}><option value="all">전체 OS</option><option value="android">Android</option><option value="ios">iOS</option></select></label><span className="range">각 서비스 시간대 기준 · {days}일</span></div>
 
  {page==='overview'&&!!apps.length&&<>

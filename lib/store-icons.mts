@@ -1,5 +1,12 @@
 import {PKG_RE,APPLE_APP_ID_RE} from './apps.ts';
 
+/** Prefer a square Play CDN size; og:image often ends with =s0-br30 (wide banner). */
+export function normalizeStoreIconUrl(url:string){
+ if(/play-lh\.googleusercontent\.com/i.test(url))return url.replace(/=s0-br\d+$/i,'=s128').replace(/=w\d+-h\d+.*$/i,'=s128').replace(/=s\d+$/i,'=s128');
+ if(/mzstatic\.com/i.test(url))return url.replace(/\/\d+x\d+bb\./,'/128x128bb.');
+ return url;
+}
+
 /** Public Play Store listing → og:image (Googleusercontent CDN). */
 export async function fetchPlayStoreIconUrl(packageName:string,fetcher:typeof fetch=fetch){
  if(!PKG_RE.test(packageName))return null;
@@ -17,9 +24,9 @@ export async function fetchPlayStoreIconUrl(packageName:string,fetcher:typeof fe
   const html=await res.text();
   const og=html.match(/property=["']og:image["']\s+content=["']([^"']+)["']/i)
    ||html.match(/content=["']([^"']+)["']\s+property=["']og:image["']/i);
-  if(og?.[1])return og[1];
+  if(og?.[1])return normalizeStoreIconUrl(og[1]);
   const item=html.match(/itemprop=["']image["']\s+content=["']([^"']+)["']/i);
-  return item?.[1]||null;
+  return item?.[1]?normalizeStoreIconUrl(item[1]):null;
  }catch{return null;}
 }
 
@@ -31,7 +38,8 @@ export async function fetchItunesIconUrl(appleAppId:string,fetcher:typeof fetch=
   if(!res.ok)return null;
   const body=await res.json() as {results?:{artworkUrl512?:string;artworkUrl100?:string}[]};
   const row=body.results?.[0];
-  return row?.artworkUrl512||row?.artworkUrl100||null;
+  const url=row?.artworkUrl512||row?.artworkUrl100||null;
+  return url?normalizeStoreIconUrl(url):null;
  }catch{return null;}
 }
 

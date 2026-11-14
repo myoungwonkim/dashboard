@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {extractOgImage,fetchItunesIconUrl,fetchPlayStoreIconUrl} from '../lib/store-icons.mts';
+import {extractOgImage,fetchItunesIconUrl,fetchPlayStoreIconUrl,normalizeStoreIconUrl} from '../lib/store-icons.mts';
 
 test('extractOgImage reads Play listing markup',()=>{
  const html='<html><meta property="og:image" content="https://play-lh.googleusercontent.com/icon.png"><title>App</title></html>';
  assert.equal(extractOgImage(html),'https://play-lh.googleusercontent.com/icon.png');
+});
+
+test('normalizeStoreIconUrl picks square Play CDN size',()=>{
+ assert.equal(
+  normalizeStoreIconUrl('https://play-lh.googleusercontent.com/abc=s0-br30'),
+  'https://play-lh.googleusercontent.com/abc=s128',
+ );
 });
 
 test('Play icon fetch uses og:image from listing HTML',async()=>{
