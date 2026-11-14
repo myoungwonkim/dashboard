@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {admobApps,admobQuery,reportBody,formatReportBody,parseAdmobReport,parseFormatReport,fetchAdmobAccount} from '../lib/admob-core.mts';
+import {admobApps,admobQuery,reportBody,formatReportBody,adUnitReportBody,parseAdmobReport,parseFormatReport,parseAdUnitReport,fetchAdmobAccount} from '../lib/admob-core.mts';
 import {seal,unseal,validateOAuthClient,admobRedirect,authorizationUrl,hash} from '../lib/admob-crypto.mts';
 const q={app:'bazi',days:7,country:'all',os:'all'};
 const response=(rows)=>[{header:{localizationSettings:{currencyCode:'USD'}}},...rows.map(row=>({row})),{footer:{matchingRowCount:rows.length}}];
@@ -9,6 +9,20 @@ test('app and OS select only the registered inventory',()=>{assert.equal(admobAp
 test('AdMob calendar dates follow account timezone and exclude today',()=>{const spec=reportBody(q,'America/Los_Angeles',undefined,new Date('2026-11-08T00:30:00Z')).reportSpec;assert.deepEqual(spec.dateRange,{startDate:{year:2026,month:10,day:31},endDate:{year:2026,month:11,day:6}});assert.equal(spec.timeZone,undefined);assert.deepEqual(formatReportBody(q,'UTC',undefined,new Date('2026-11-08T00:00:00Z')).reportSpec.dimensions,['FORMAT']);});
 test('earnings micros and weighted eCPM sum across OS correctly',()=>{const data=parseAdmobReport(response([row(admobApps[0].appId,2000000,1000,{adRequests:2000,matched:1500}),row(admobApps[1].appId,1000000,100,{adRequests:200,matched:100})]),q);assert.equal(data.revenue,3);assert.equal(data.impressions,1100);assert.equal(data.ecpm,3/1100*1000);assert.equal(data.daily[0].revenue,3);assert.equal(data.adRequests,2200);assert.equal(data.matchedRequests,1600);assert.equal(data.matchRate,1600/2200);assert.equal(data.showRate,1100/1600);assert.equal(data.countries[0].country,'KR');});
 test('format report parses revenue by format',()=>{const formats=parseFormatReport(response([{dimensionValues:{FORMAT:{value:'BANNER'}},metricValues:{ESTIMATED_EARNINGS:{microsValue:'500000'},IMPRESSIONS:{integerValue:'50'},CLICKS:{integerValue:'1'},AD_REQUESTS:{integerValue:'100'},MATCHED_REQUESTS:{integerValue:'80'}}}]));assert.equal(formats[0].format,'BANNER');assert.equal(formats[0].revenue,0.5);});
+test('ad unit report body includes AD_UNIT and FORMAT',()=>{assert.deepEqual(adUnitReportBody(q,'UTC',undefined,new Date('2026-11-08T00:00:00Z')).reportSpec.dimensions,['AD_UNIT','FORMAT']);});
+test('ad unit report parses and merges duplicate unit/format rows',()=>{
+ const unit='ca-app-pub-4999376453226791/111';
+ const rows=response([
+  {dimensionValues:{AD_UNIT:{value:unit},FORMAT:{value:'BANNER'}},metricValues:{ESTIMATED_EARNINGS:{microsValue:'500000'},IMPRESSIONS:{integerValue:'50'},CLICKS:{integerValue:'1'},AD_REQUESTS:{integerValue:'100'},MATCHED_REQUESTS:{integerValue:'80'}}},
+  {dimensionValues:{AD_UNIT:{value:unit},FORMAT:{value:'BANNER'}},metricValues:{ESTIMATED_EARNINGS:{microsValue:'500000'},IMPRESSIONS:{integerValue:'50'},CLICKS:{integerValue:'1'},AD_REQUESTS:{integerValue:'100'},MATCHED_REQUESTS:{integerValue:'80'}}},
+  {dimensionValues:{AD_UNIT:{value:'ca-app-pub-4999376453226791/222'},FORMAT:{value:'REWARDED'}},metricValues:{ESTIMATED_EARNINGS:{microsValue:'2000000'},IMPRESSIONS:{integerValue:'10'},CLICKS:{integerValue:'0'},AD_REQUESTS:{integerValue:'20'},MATCHED_REQUESTS:{integerValue:'10'}}},
+ ]);
+ const units=parseAdUnitReport(rows);
+ assert.equal(units[0].adUnitId,'ca-app-pub-4999376453226791/222');
+ assert.equal(units[0].revenue,2);
+ assert.equal(units[1].revenue,1);
+ assert.equal(units[1].impressions,100);
+});
 test('empty results are zero but malformed, wrong inventory and currency are rejected',()=>{assert.equal(parseAdmobReport(response([]),q).revenue,0);assert.throws(()=>parseAdmobReport([],q));assert.throws(()=>parseAdmobReport(response([row(admobApps[2].appId,100,1)]),q));const v=response([]);v[0].header.localizationSettings.currencyCode='KRW';assert.throws(()=>parseAdmobReport(v,q));});
 test('truncated report footer is marked limited',()=>{const v=response([]);v.at(-1).footer.matchingRowCount=20;assert.equal(parseAdmobReport(v,q).limited,true);});
 test('publisher identity cannot be substituted',async()=>{await assert.rejects(fetchAdmobAccount('unused',async()=>new Response(JSON.stringify({name:'accounts/pub-other',reportingTimeZone:'UTC'}),{status:200})),/invalid_response/);});
