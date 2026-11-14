@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import type {AppRecord} from '@/lib/apps';
+import {appColor} from '@/lib/app-colors';
 import TrendChart from './trend-chart';
 type Daily={date:string,active:number,newUsers?:number,sessions?:number};
 type Data={
@@ -23,13 +24,14 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{ap
  let result:Result;try{const res=await fetch('/api/ga4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate,endDate,country,os}),signal:controller.signal});const body=await res.json() as Result;result=res.ok&&body.status==='success'?body:{status:'error',message:body.status==='error'?body.message:'조회에 실패했습니다.'};}catch{result={status:'error',message:'서버에 연결할 수 없습니다.'};}
  if(active)setResults(prev=>({...prev,[a.id]:result}));
  })).finally(()=>{if(active)setLoading(false);});return ()=>{active=false;controller.abort();};},[app,days,startDate,endDate,country,os,retry,targets.map(t=>t.id).join(',')]);
- const chartSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];return [{name:a.name,color:app?'#222':'#555',points:r.data.daily.map(d=>({date:d.date,value:d.active}))}];});
- const newUserSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];return [{name:a.name+' 신규',color:'#888',dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.newUsers??0}))}];});
+ // Solid = active (app color); dashed = new users (same color).
+ const chartSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];const color=appColor(a.id);return [{name:a.name+' 활성',color,points:r.data.daily.map(d=>({date:d.date,value:d.active}))}];});
+ const newUserSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];const color=appColor(a.id);return [{name:a.name+' 신규',color,dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.newUsers??0}))}];});
  const detail=app?results[app]:undefined;
  const detailData=detail?.status==='success'?detail.data:null;
- return <section className="ga4live"><div className="sectiontitle"><h2>Firebase / GA4 실제 데이터</h2><button className="refresh" disabled={loading} onClick={()=>setRetry(v=>v+1)}>{loading?'조회 중…':'새로고침'}</button></div><p className="note">각 GA4 속성의 시간대 기준, {startDate} ~ {endDate} ({days}일) · 오늘 포함 시 집계 중 · 앱 간 사용자 중복 제거 없음 · 유입은 firstUser (AF 대체)</p>
+ return <section className="ga4live"><div className="sectiontitle"><h2>Firebase / GA4 실제 데이터</h2><button className="refresh" disabled={loading} onClick={()=>setRetry(v=>v+1)}>{loading?'조회 중…':'새로고침'}</button></div><p className="note">각 GA4 속성의 시간대 기준, {startDate} ~ {endDate} ({days}일) · 오늘 포함 시 집계 중 · 앱 간 사용자 중복 제거 없음 · 유입은 firstUser (AF 대체) · 색=앱, 점선=신규</p>
  {!targets.length?<p className="note">GA4 속성이 연결된 앱이 없습니다. 데이터 연결에서 앱을 추가해 주세요.</p>:<>
- <div className="livegrid" aria-live="polite">{targets.map(a=>{const result=results[a.id];return <article key={a.id} className="livecard"><h3>{a.name}</h3>{!result?<p>연결 상태를 확인하고 있습니다.</p>:result.status==='error'?<p role="status">{result.message}</p>:<><dl>{[
+ <div className="livegrid" aria-live="polite">{targets.map(a=>{const result=results[a.id];return <article key={a.id} className="livecard"><h3><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}</h3>{!result?<p>연결 상태를 확인하고 있습니다.</p>:result.status==='error'?<p role="status">{result.message}</p>:<><dl>{[
   ['기간 활성 사용자',result.data.activeUsers.toLocaleString()],
   ['일평균 DAU',result.data.averageDau.toLocaleString()],
   ['신규 사용자',(result.data.newUsers??0).toLocaleString()],

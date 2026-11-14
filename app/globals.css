@@ -39,6 +39,9 @@
 .playsteps{display:flex;gap:8px;margin:12px 0 16px}
 .playstep{flex:1;text-align:center;padding:10px 8px;border:1px solid #e5e5e0;border-radius:8px;font-size:12px;color:#999;background:#fff}
 .playstep.done{border-color:#cfcfc9;background:#f4f4f2;color:#333;font-weight:600}
+.appdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle;flex-shrink:0}
+.livecard h3{display:flex;align-items:center;gap:0}
+.chartcontrols{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
 .appslist{display:grid;gap:12px;margin:8px 0 28px}
 .approw{display:flex;align-items:center;gap:14px;border:1px solid #e5e5e0;border-radius:8px;padding:16px 18px}
 .approw .meta{flex:1;min-width:0}.approw .meta strong{font-weight:500}.approw .meta span{display:block;font-size:11px;color:#999;margin-top:3px}

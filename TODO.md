@@ -24,6 +24,7 @@
 - [x] Overview/Connections 빈 상태·앱 수정·Progress 코드완료 표시
 - [x] Overview KPI 단순화(핵심/확장)·상세 접기·Play 날짜범위 정렬
 - [x] Connections 필수 체크·Play 3단계·Progress 콘솔 대조 안내
+- [x] 앱별 고정 색·차트 점선 규칙·일/주/월 집계·파비콘 미니차트
 - [ ] AppsFlyer API 연동 (무료 Zero — API 제외, ID 메타만)
 - [ ] P4: 정산·Crashlytics BQ·알림 채널 (선택)
 

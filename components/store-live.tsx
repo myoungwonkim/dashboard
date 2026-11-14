@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import type {AppRecord} from '@/lib/apps';
+import {appColor} from '@/lib/app-colors';
 import TrendChart from './trend-chart';
 type Spike={date:string;value:number;baseline:number;direction:'up'|'down';ratio:number|null};
 type Dim={key:string;installs:number;visitors:number;pageViews:number;conversions:number;ratingAvg:number|null};
@@ -24,14 +25,14 @@ export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRec
   Promise.all(tasks).finally(()=>{if(active)setLoading(false);});
   return ()=>{active=false;c.abort();};
  },[app,days,startDate,endDate,retry,playTargets.map(t=>t.id).join(','),ascTargets.map(t=>t.id).join(',')]);
- const playCharts=playTargets.flatMap(a=>{const r=play[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 설치',color:'#444',points:r.data.daily.map(d=>({date:d.date,value:d.installs}))}];});
- const ascCharts=ascTargets.flatMap(a=>{const r=asc[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 다운로드',color:'#888',dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.downloads}))}];});
+ const playCharts=playTargets.flatMap(a=>{const r=play[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 설치',color:appColor(a.id),points:r.data.daily.map(d=>({date:d.date,value:d.installs}))}];});
+ const ascCharts=ascTargets.flatMap(a=>{const r=asc[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' iOS',color:appColor(a.id),dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.downloads}))}];});
  const detailPlay=app?play[app]:undefined;const detailAsc=app?asc[app]:undefined;
  return <section className="ga4live">
   <div className="sectiontitle"><h2>스토어 · 유입 본선</h2><button className="refresh" disabled={loading} onClick={()=>setRetry(x=>x+1)}>{loading?'조회 중…':'새로고침'}</button></div>
-  <p className="note">Play 설치·ASC 다운로드가 유입 1순위입니다. 미연결 시 가짜 숫자 없이 연결 안내만 표시합니다.</p>
+  <p className="note">Play 설치·ASC 다운로드가 유입 1순위입니다. 미연결 시 가짜 숫자 없이 연결 안내만 표시합니다. · 실선=Play, 점선=ASC · 색=앱</p>
   <div className="livegrid" aria-live="polite">
-   {playTargets.map(a=>{const r=play[a.id];return <article className="livecard" key={'play-'+a.id}><h3>{a.name} · Play</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
+   {playTargets.map(a=>{const r=play[a.id];return <article className="livecard" key={'play-'+a.id}><h3><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name} · Play</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
     <div><dt>패키지</dt><dd>{r.data.packageName}</dd></div>
     <div><dt>설치 (기간)</dt><dd>{r.data.installs==null?<a href="/connections">배치 대기</a>:r.data.installs.toLocaleString()}</dd></div>
     <div><dt>삭제</dt><dd>{r.data.uninstalls==null?'—':r.data.uninstalls.toLocaleString()}</dd></div>
@@ -42,7 +43,7 @@ export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRec
    </dl><SpikeNote spike={r.data.spike}/>{r.data.note&&<p className="note">{r.data.note}</p>}<small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</small>
    {!!r.data.reviews.length&&<div className="tablewrap" style={{marginTop:12}}><table><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td style={{whiteSpace:'normal',textAlign:'left'}}>{v.text||v.author}</td></tr>)}</tbody></table></div>}
    </>}</article>;})}
-   {ascTargets.map(a=>{const r=asc[a.id];return <article className="livecard" key={'asc-'+a.id}><h3>{a.name} · App Store</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">ASC 연결 →</a></>:<><dl>
+   {ascTargets.map(a=>{const r=asc[a.id];return <article className="livecard" key={'asc-'+a.id}><h3><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name} · App Store</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">ASC 연결 →</a></>:<><dl>
     <div><dt>Apple ID</dt><dd>{r.data.appleAppId}</dd></div>
     <div><dt>번들</dt><dd>{r.data.bundleId||'—'}</dd></div>
     <div><dt>다운로드</dt><dd>{r.data.downloads==null?'배치 대기':r.data.downloads.toLocaleString()}</dd></div>
