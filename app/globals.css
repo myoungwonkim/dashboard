@@ -98,14 +98,20 @@
 .users-map-scale{flex:1;max-width:180px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl(40 6% 92%),hsl(40 6% 30%))}
 /* ~5 dense rows (+ header); scroll when version list exceeds viewport */
 .version-scroll{max-height:calc(2.6em + 5 * 2.85em);overflow:auto;overscroll-behavior:contain}
-.marketing-title{flex-wrap:wrap;gap:10px 14px}
-.marketing-title .channel-toggles{margin-left:auto;margin-right:0}
-.channel-toggles{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
-.channel-toggle{border:1px solid #e2e2df;background:#fff;color:#777;border-radius:7px;padding:5px 10px;font:inherit;font-size:11px;cursor:pointer}
-.channel-toggle.on{border-color:#cfcfc9;background:#efefed;color:#222;font-weight:600}
-.channel-toggle:hover{border-color:#bbb;color:#333}
-.channel-toggle:focus-visible{outline:2px solid #777;outline-offset:2px}
-@media(max-width:720px){.marketing-title .channel-toggles{margin-left:0;width:100%}}
+.marketing-title{flex-wrap:wrap;align-items:center;gap:8px 12px}
+.marketing-title-row{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.marketing-title-row h2{margin:0}
+.channel-window{display:inline-flex;align-items:stretch;flex-wrap:nowrap;border:1px solid #d8d8d4;border-radius:8px;overflow:hidden;background:#fff;box-shadow:inset 0 1px 0 #fff}
+.channel-seg{border:0;border-right:1px solid #e5e5e0;background:transparent;color:#777;padding:6px 11px;font:inherit;font-size:11px;line-height:1.2;cursor:pointer;white-space:nowrap}
+.channel-seg:last-child{border-right:0}
+.channel-seg:hover{background:#f6f6f4;color:#333}
+.channel-seg.on{background:#efefed;color:#1f1f1f;font-weight:600}
+.channel-seg:focus-visible{outline:2px solid #777;outline-offset:-2px;z-index:1}
+@media(max-width:720px){
+ .marketing-title-row{width:100%}
+ .channel-window{flex-wrap:wrap;width:100%}
+ .channel-seg{flex:1 1 auto;text-align:center}
+}
 .trendchart .plot{position:relative;touch-action:none}
 .chart-tip{position:absolute;top:8px;transform:translateX(-50%);z-index:2;min-width:140px;max-width:240px;padding:8px 10px;border:1px solid #e5e5e0;border-radius:8px;background:#fff;box-shadow:0 8px 24px #00000014;font-size:11px;color:#555;pointer-events:none}
 .chart-tip strong{display:block;margin-bottom:6px;color:#222;font-size:12px;font-weight:600}

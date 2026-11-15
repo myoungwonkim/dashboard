@@ -7,43 +7,52 @@ import TrendChart from './trend-chart';
 type Day={date:string;spend:number};
 type Data={spend:number;bySource:Record<string,number>;daily:Day[];rows?:MarketingDay[];roas:number|null;fetchedAt:string};
 type Result={status:'success';data:Data}|{status:'error',message:string};
-type ChannelFilter='all'|MarketingSource;
 
 function fmtSpend(v:number|null|undefined){return v==null||!Number.isFinite(v)?'—':'$'+v.toFixed(2);}
 function fmtCpi(v:number|null|undefined){return v==null||!Number.isFinite(v)?'—':'$'+v.toFixed(2);}
 function roas(revenue:number|null|undefined,spend:number|null|undefined){if(revenue==null||spend==null||!(spend>0))return null;return revenue/spend;}
 
-const CHANNELS: {id:ChannelFilter;label:string}[]=[
- {id:'all',label:'전체'},
+const SOURCE_CHANNELS: {id:MarketingSource;label:string}[]=[
  {id:'google_ads',label:'Google Ads'},
  {id:'meta',label:'Meta'},
  {id:'manual',label:'수동'},
  {id:'other',label:'기타'},
 ];
+const ALL_SOURCES=SOURCE_CHANNELS.map(c=>c.id);
 
 function AppMark({id,name}:{id:string;name:string}){
  return <span className="apptitle"><span className="appdot" style={{background:appColor(id)}} aria-hidden/>{name}</span>;
 }
 
-function filterRows(rows:MarketingDay[]|undefined,channel:ChannelFilter):MarketingDay[]{
+function filterRows(rows:MarketingDay[]|undefined,selected:Set<MarketingSource>):MarketingDay[]{
  if(!rows?.length)return [];
- if(channel==='all')return rows;
- return rows.filter(r=>r.source===channel);
+ if(selected.size===0||selected.size===ALL_SOURCES.length)return rows;
+ return rows.filter(r=>selected.has(r.source));
 }
 
-function spendFromData(data:Data,channel:ChannelFilter){
- const rows=filterRows(data.rows,channel);
+function spendFromData(data:Data,selected:Set<MarketingSource>){
+ const rows=filterRows(data.rows,selected);
  if(data.rows?.length)return rollupMarketing(rows);
- if(channel==='all')return {spend:data.spend,bySource:data.bySource,daily:data.daily};
- const spend=data.bySource?.[channel]||0;
- return {spend,bySource:{[channel]:spend},daily:[] as Day[]};
+ if(selected.size===0||selected.size===ALL_SOURCES.length)return {spend:data.spend,bySource:data.bySource,daily:data.daily};
+ let spend=0;
+ const bySource:Record<string,number>={};
+ for(const id of selected){
+  const v=data.bySource?.[id]||0;
+  bySource[id]=v;spend+=v;
+ }
+ return {spend,bySource,daily:[] as Day[]};
+}
+
+function channelLabel(selected:Set<MarketingSource>){
+ if(selected.size===0||selected.size===ALL_SOURCES.length)return '전체';
+ return SOURCE_CHANNELS.filter(c=>selected.has(c.id)).map(c=>c.label).join(' · ');
 }
 
 export default function MarketingLive({apps,app,days,startDate,endDate,revenueByApp,newUsersByApp,showCharts=true}:{apps:AppRecord[];app?:string;days:number;startDate:string;endDate:string;revenueByApp?:Record<string,number|undefined>;newUsersByApp?:Record<string,number|undefined>;showCharts?:boolean}){
  const [results,setResults]=useState<Record<string,Result>>({});
  const [fetchedNewUsers,setFetchedNewUsers]=useState<Record<string,number>>({});
  const [loading,setLoading]=useState(true);
- const [channel,setChannel]=useState<ChannelFilter>('all');
+ const [selected,setSelected]=useState<Set<MarketingSource>>(()=>new Set(ALL_SOURCES));
  const targets=apps.filter(a=>!app||a.id===app);
  useEffect(()=>{
   const controller=new AbortController();let active=true;setLoading(true);setResults({});setFetchedNewUsers({});
@@ -72,7 +81,8 @@ export default function MarketingLive({apps,app,days,startDate,endDate,revenueBy
  },[app,days,startDate,endDate,targets.map(t=>t.id).join(','),JSON.stringify(revenueByApp||{}),JSON.stringify(newUsersByApp||{})]);
 
  const resolvedNew=(id:string)=>newUsersByApp?.[id]??fetchedNewUsers[id];
- const channelLabel=CHANNELS.find(c=>c.id===channel)?.label||'전체';
+ const allOn=selected.size===ALL_SOURCES.length;
+ const label=channelLabel(selected);
 
  const totals=useMemo(()=>{
   const ok=targets.map(a=>{const r=results[a.id];return r?.status==='success'?{id:a.id,data:r.data}:null;}).filter(Boolean) as {id:string;data:Data}[];
@@ -80,7 +90,7 @@ export default function MarketingLive({apps,app,days,startDate,endDate,revenueBy
   let spend=0;
   const dailyMap=new Map<string,number>();
   for(const o of ok){
-   const roll=spendFromData(o.data,channel);
+   const roll=spendFromData(o.data,selected);
    spend+=roll.spend;
    for(const d of roll.daily)dailyMap.set(d.date,(dailyMap.get(d.date)||0)+d.spend);
   }
@@ -94,28 +104,46 @@ export default function MarketingLive({apps,app,days,startDate,endDate,revenueBy
    newUsers,
    n:ok.length,
   };
- },[targets,results,revenueByApp,newUsersByApp,fetchedNewUsers,channel]);
+ },[targets,results,revenueByApp,newUsersByApp,fetchedNewUsers,selected]);
 
  const chartSeries=targets.flatMap(a=>{
   const r=results[a.id];if(!r||r.status!=='success')return [];
-  const roll=spendFromData(r.data,channel);
+  const roll=spendFromData(r.data,selected);
   if(!roll.daily.length)return [];
   return [{name:a.name+' 비용',color:appColor(a.id),points:roll.daily.map(d=>({date:d.date,value:d.spend})),format:'usd' as const}];
  });
 
+ function selectAll(){setSelected(new Set(ALL_SOURCES));}
+ function toggleChannel(id:MarketingSource){
+  setSelected(prev=>{
+   const next=new Set(prev);
+   if(next.has(id)){
+    next.delete(id);
+    if(!next.size)return new Set(ALL_SOURCES);
+   }else next.add(id);
+   return next;
+  });
+ }
+
  return <section className="ga4live">
   <div className="sectiontitle marketing-title">
-   <h2>마케팅 비용</h2>
-   <div className="channel-toggles" role="group" aria-label="마케팅 채널">
-    {CHANNELS.map(c=><button type="button" key={c.id} className={'channel-toggle'+(channel===c.id?' on':'')} aria-pressed={channel===c.id} onClick={()=>setChannel(c.id)}>{c.label}</button>)}
+   <div className="marketing-title-row">
+    <h2>마케팅 비용</h2>
+    <div className="channel-window" role="group" aria-label="마케팅 채널(복수 선택)">
+     <button type="button" className={'channel-seg'+(allOn?' on':'')} aria-pressed={allOn} onClick={selectAll}>전체</button>
+     {SOURCE_CHANNELS.map(c=>{
+      const on=selected.has(c.id);
+      return <button type="button" key={c.id} className={'channel-seg'+(on?' on':'')} aria-pressed={on} onClick={()=>toggleChannel(c.id)}>{c.label}</button>;
+     })}
+    </div>
    </div>
-   <span>{loading?'조회 중…':channelLabel}</span>
+   <span>{loading?'조회 중…':label}</span>
   </div>
-  <p className="note">{startDate} ~ {endDate} ({days}일) · 채널 필터: {channelLabel} · CPI = 비용 ÷ GA4 신규 · ROAS = AdMob 수익 ÷ 비용 · <a href="/connections#marketing">비용 입력</a></p>
+  <p className="note">{startDate} ~ {endDate} ({days}일) · 채널: {label} · CPI = 비용 ÷ GA4 신규 · ROAS = AdMob 수익 ÷ 비용 · <a href="/connections#marketing">비용 입력</a></p>
   <div className="livegrid" aria-live="polite">
-   {totals&&!loading&&targets.length>1&&<article className="livecard aggregate"><h3>전체 합산 <small>{totals.n}개 앱 · {channelLabel}</small></h3><dl>{[
+   {totals&&!loading&&targets.length>1&&<article className="livecard aggregate"><h3>전체 합산 <small>{totals.n}개 앱 · {label}</small></h3><dl>{[
     ['마케팅 비용',fmtSpend(totals.spend)],
-    [channel==='all'?'eCPI':'CPI',fmtCpi(totals.ecpi)],
+    [allOn?'eCPI':'CPI',fmtCpi(totals.ecpi)],
     ['신규(GA4)',totals.newUsers?totals.newUsers.toLocaleString():'—'],
     ['ROAS',totals.roas==null?'—':totals.roas.toFixed(2)+'x'],
    ].map(([n,v])=><div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl><small>선택한 채널 비용만 합산합니다. CPI = 비용 ÷ 신규 사용자.</small></article>}
@@ -124,19 +152,19 @@ export default function MarketingLive({apps,app,days,startDate,endDate,revenueBy
     const neu=resolvedNew(a.id);
     if(!r)return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3><p>비용 조회 중…</p></article>;
     if(r.status==='error')return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3><p>{r.message}</p><a href="/connections#marketing">마케팅 연결 →</a></article>;
-    const roll=spendFromData(r.data,channel);
+    const roll=spendFromData(r.data,selected);
     const spend=roll.spend;
     return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3>
      <dl>{[
       ['마케팅 비용',fmtSpend(spend)],
-      [channel==='all'?'eCPI':'CPI',fmtCpi(cpi(spend,neu))],
+      [allOn?'eCPI':'CPI',fmtCpi(cpi(spend,neu))],
       ['신규(GA4)',neu!=null?neu.toLocaleString():'—'],
       ['ROAS',roas(revenueByApp?.[a.id],spend)==null?'—':roas(revenueByApp?.[a.id],spend)!.toFixed(2)+'x'],
      ].map(([n,v])=><div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl>
-     <small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST · {channelLabel}</small>
+     <small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST · {label}</small>
     </article>;
    })}
   </div>
-  {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 마케팅 비용</h2><span>{channelLabel}</span></div><TrendChart series={chartSeries}/></div>}
+  {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 마케팅 비용</h2><span>{label}</span></div><TrendChart series={chartSeries}/></div>}
  </section>;
 }
