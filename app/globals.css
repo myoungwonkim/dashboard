@@ -71,6 +71,12 @@
 .trendchart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .trendchart .legend{display:flex;gap:16px;font-size:11px;color:#777;flex-wrap:wrap}
 .trendchart .legend i{display:inline-block;width:18px;margin-right:6px;vertical-align:middle;background:#333;height:2px}
+.trendchart .plot{position:relative;touch-action:none}
+.chart-tip{position:absolute;top:8px;transform:translateX(-50%);z-index:2;min-width:140px;max-width:240px;padding:8px 10px;border:1px solid #e5e5e0;border-radius:8px;background:#fff;box-shadow:0 8px 24px #00000014;font-size:11px;color:#555;pointer-events:none}
+.chart-tip strong{display:block;margin-bottom:6px;color:#222;font-size:12px;font-weight:600}
+.chart-tip>div{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center;margin-top:4px}
+.chart-tip i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.chart-tip b{font-weight:600;color:#222;font-variant-numeric:tabular-nums}
 .charttype{display:inline-flex;border:1px solid #e2e2df;border-radius:6px;overflow:hidden}
 .charttype button{font:inherit;font-size:11px;border:0;background:#fff;color:#777;padding:6px 10px;cursor:pointer}
 .charttype button.selected{background:#efefed;color:#242424;font-weight:600}
