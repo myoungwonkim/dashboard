@@ -250,7 +250,7 @@ export default function Dashboard({page}:{page:string}){
  <MarketingSetup apps={apps}/>
  <div className="connectionlist">{[
  ['AppsFlyer','무료 Zero — Pull API 없음. 앱 ID만 보관합니다.','유료/트라이얼 전환 시 Aggregate 연동을 검토합니다.'],
- ['마케팅 비용','Google Ads·Meta 자동 동기화 + CSV/수동 일별 업로드.','Connections → 마케팅 비용에서 계정·업로드를 관리합니다.'],
+ ['마케팅 비용','앱·날짜·비용 수동 입력이 기본. CSV·API는 선택.','Connections → 마케팅 비용.'],
  ['스토어 배치','Play GCS CSV · ASC Sales Report → D1.','매일 UTC 21:00 또는 수동 실행.']
  ].map(([name,first,second])=><section className="connection" key={name}><div className="sectiontitle"><h2>{name}</h2><span className="status">안내</span></div><p>{first}</p><p>{second}</p></section>)}</div>
  <section className="projectids"><h2>AdMob 게시자</h2><p className="note">게시자 ID: {admobPublisherId} · 앱별 ca-app-pub ID는 앱 행에 저장</p></section>

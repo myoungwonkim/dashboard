@@ -24,7 +24,11 @@
 
 @media(max-width:420px){.pagepicker-trigger{max-width:min(220px,62vw);font-size:12px}}
 
-.marketing-csv{width:100%;max-width:720px;box-sizing:border-box;font:inherit;font-size:12px;line-height:1.45;padding:12px;border:1px solid #ddd;border-radius:8px;resize:vertical;min-height:120px}
+.marketing-csv{width:100%;max-width:720px;box-sizing:border-box;font:inherit;font-size:12px;line-height:1.45;padding:12px;border:1px solid #ddd;border-radius:8px;resize:vertical;min-height:120px;margin-top:10px}
+.marketing-simple{max-width:420px;margin:16px 0 8px}
+.marketing-more{margin:18px 0;padding:12px 14px;border:1px solid #eee;border-radius:8px;background:#fafafa}
+.marketing-more>summary{cursor:pointer;font-size:13px;color:#555;font-weight:500}
+.marketing-more[open]>summary{margin-bottom:10px}
 .noticefold{margin:0 0 4px}
 .noticefold-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;border:1px solid #eeeee9;background:#f6f6f4;color:#74746e;border-radius:6px;padding:10px 14px;font:inherit;font-size:12px;cursor:pointer}
 .noticefold-toggle:hover{background:#f0f0ed;color:#555}

@@ -48,8 +48,8 @@ export default function MarketingLive({apps,app,days,startDate,endDate,revenueBy
  });
 
  return <section className="ga4live">
-  <div className="sectiontitle"><h2>마케팅 비용</h2><span>{loading?'조회 중…':'Google Ads · Meta · 수동'}</span></div>
-  <p className="note">{startDate} ~ {endDate} ({days}일) · ROAS = AdMob 수익 ÷ 마케팅 비용 · 미등록 시 0</p>
+  <div className="sectiontitle"><h2>마케팅 비용</h2><span>{loading?'조회 중…':'비용 · ROAS'}</span></div>
+  <p className="note">{startDate} ~ {endDate} ({days}일) · ROAS = AdMob 수익 ÷ 비용 · <a href="/connections#marketing">비용 입력</a></p>
   <div className="livegrid" aria-live="polite">
    {totals&&!loading&&targets.length>1&&<article className="livecard aggregate"><h3>전체 합산 <small>{totals.n}개 앱</small></h3><dl>{[
     ['마케팅 비용 합',fmtSpend(totals.spend)],
