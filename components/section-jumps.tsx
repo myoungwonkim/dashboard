@@ -5,7 +5,7 @@ export type SectionJump={id:string;label:string};
 export default function SectionJumps({items}:{items:SectionJump[]}){
  const [active,setActive]=useState('');
  useEffect(()=>{
-  function sync(){setActive(location.hash.replace(/^#/,'');}
+  function sync(){setActive(location.hash.replace(/^#/,''));}
   sync();
   window.addEventListener('hashchange',sync);
   return ()=>window.removeEventListener('hashchange',sync);
