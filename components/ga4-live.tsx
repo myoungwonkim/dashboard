@@ -9,6 +9,7 @@ import {recentAppVersions} from '@/lib/app-version.mts';
 import MetricTable from './metric-table';
 import SortTh from './sort-th';
 import {sortBy,type SortDir,type SortState} from '@/lib/table-sort.mts';
+import AppToggle,{useAppFilter} from './app-toggle';
 type Daily={date:string,active:number,newUsers?:number,sessions?:number};
 type Retention={summary:{d1:number|null;d7:number|null;d14:number|null;d30:number|null;cohorts:number;endOffset:number};rows:{cohort:string;users:number;rates:Record<number,number|null>}[];offsets:number[]};
 type Data={
@@ -67,34 +68,40 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
  if(active)setResults(prev=>({...prev,[a.id]:result}));
  })).finally(()=>{if(active)setLoading(false);});return ()=>{active=false;controller.abort();};},[app,days,startDate,endDate,country,os,targets.map(t=>t.id).join(',')]);
  const ok=useMemo(()=>targets.map(a=>{const r=results[a.id];return r?.status==='success'?{app:a,data:r.data}:null;}).filter(Boolean) as {app:AppRecord;data:Data}[],[targets,results]);
+ const appOpts=useMemo(()=>targets.map(a=>({id:a.id,name:a.name})),[targets]);
+ const filter=useAppFilter(appOpts);
+ const retFilter=useAppFilter(appOpts);
+ const viewTargets=useMemo(()=>targets.filter(a=>filter.includes(a.id)),[targets,filter.selected,filter.allOn]);
+ const viewOk=useMemo(()=>ok.filter(o=>filter.includes(o.app.id)),[ok,filter.selected,filter.allOn]);
+ const retTargets=useMemo(()=>targets.filter(a=>retFilter.includes(a.id)),[targets,retFilter.selected,retFilter.allOn]);
  const totals=useMemo(()=>{
-  if(ok.length<2)return null;
-  const activeUsers=sumNums(ok.map(o=>o.data.activeUsers))!;
-  const sessions=sumNums(ok.map(o=>o.data.sessions))!;
-  const newUsers=sumNums(ok.map(o=>o.data.newUsers??0))!;
-  const events=sumNums(ok.map(o=>o.data.events))!;
-  const engaged=sumNums(ok.map(o=>o.data.engagedSessions??0))!;
-  const averageDau=sumNums(ok.map(o=>o.data.averageDau))!;
+  if(viewOk.length<2)return null;
+  const activeUsers=sumNums(viewOk.map(o=>o.data.activeUsers))!;
+  const sessions=sumNums(viewOk.map(o=>o.data.sessions))!;
+  const newUsers=sumNums(viewOk.map(o=>o.data.newUsers??0))!;
+  const events=sumNums(viewOk.map(o=>o.data.events))!;
+  const engaged=sumNums(viewOk.map(o=>o.data.engagedSessions??0))!;
+  const averageDau=sumNums(viewOk.map(o=>o.data.averageDau))!;
   return {
    activeUsers,sessions,newUsers,events,engagedSessions:engaged,averageDau,
-   engagementRate:weightedMean(ok.map(o=>({value:o.data.engagementRate??null,weight:o.data.sessions}))),
+   engagementRate:weightedMean(viewOk.map(o=>({value:o.data.engagementRate??null,weight:o.data.sessions}))),
    sessionsPerUser:activeUsers?sessions/activeUsers:null,
-   averageSessionDuration:weightedMean(ok.map(o=>({value:o.data.averageSessionDuration??null,weight:o.data.sessions}))),
-   crashFreeUsersRate:meanNums(ok.map(o=>o.data.crashFreeUsersRate)),
-   d1:weightedMean(ok.map(o=>({value:o.data.retention?.summary.d1??null,weight:o.data.retention?.summary.cohorts||o.data.newUsers||1}))),
-   d7:weightedMean(ok.map(o=>({value:o.data.retention?.summary.d7??null,weight:o.data.retention?.summary.cohorts||o.data.newUsers||1}))),
-   n:ok.length,
+   averageSessionDuration:weightedMean(viewOk.map(o=>({value:o.data.averageSessionDuration??null,weight:o.data.sessions}))),
+   crashFreeUsersRate:meanNums(viewOk.map(o=>o.data.crashFreeUsersRate)),
+   d1:weightedMean(viewOk.map(o=>({value:o.data.retention?.summary.d1??null,weight:o.data.retention?.summary.cohorts||o.data.newUsers||1}))),
+   d7:weightedMean(viewOk.map(o=>({value:o.data.retention?.summary.d7??null,weight:o.data.retention?.summary.cohorts||o.data.newUsers||1}))),
+   n:viewOk.length,
   };
- },[ok]);
- const chartSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];const color=appColor(a.id);return [{name:a.name+' 활성',color,points:r.data.daily.map(d=>({date:d.date,value:d.active}))}];});
- const newUserSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];const color=appColor(a.id);return [{name:a.name+' 신규',color,dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.newUsers??0}))}];});
+ },[viewOk]);
+ const chartSeries=viewTargets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];const color=appColor(a.id);return [{name:a.name+' 활성',color,points:r.data.daily.map(d=>({date:d.date,value:d.active}))}];});
+ const newUserSeries=viewTargets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];const color=appColor(a.id);return [{name:a.name+' 신규',color,dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.newUsers??0}))}];});
  const mapSources=useMemo(()=>ok
   .map(o=>({id:o.app.id,name:o.app.name,countries:o.data.countries||[]}))
   .filter(s=>s.countries.length),
  [ok]);
  const detail=app?results[app]:undefined;
  const detailData=detail?.status==='success'?detail.data:null;
- return <section className="ga4live" id="section-ga4"><div className="sectiontitle"><h2>Firebase / GA4 실제 데이터</h2><span>{loading?'조회 중…':'GA4'}</span></div><p className="note">각 GA4 속성의 시간대 기준, {startDate} ~ {endDate} ({days}일) · 앱 간 사용자 중복 제거 없음 · 합산=절대값 합 · 리텐션·참여율=가중 평균 · 색=앱, 점선=신규</p>
+ return <section className="ga4live" id="section-ga4"><div className="sectiontitle marketing-title"><div className="marketing-title-row"><h2>Firebase / GA4 실제 데이터</h2><AppToggle apps={appOpts} allOn={filter.allOn} selected={filter.selected} onSelectAll={filter.selectAll} onToggle={filter.toggle} label="GA4 앱"/></div><span>{loading?'조회 중…':filter.label}</span></div><p className="note">각 GA4 속성의 시간대 기준, {startDate} ~ {endDate} ({days}일) · 앱 간 사용자 중복 제거 없음 · 합산=절대값 합 · 리텐션·참여율=가중 평균 · {filter.label}</p>
  {!targets.length?<p className="note">GA4 속성이 연결된 앱이 없습니다. 데이터 연결에서 앱을 추가해 주세요.</p>:<>
  <div className="livegrid" aria-live="polite">
   {totals&&!loading&&<article className="livecard aggregate"><h3>전체 합산 · 평균 <small>{totals.n}개 앱</small></h3><dl>{[
@@ -111,7 +118,7 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
    ['리텐션 D1(가중)',fmtRate(totals.d1)],
    ['리텐션 D7(가중)',fmtRate(totals.d7)],
   ].map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><small>절대값은 합산, 비율·리텐션은 앱별 코호트/세션 가중 평균입니다.</small></article>}
-  {targets.map(a=>{const result=results[a.id];return <article key={a.id} className="livecard"><h3><AppMark id={a.id} name={a.name}/></h3>{!result?<p>연결 상태를 확인하고 있습니다.</p>:result.status==='error'?<p role="status">{result.message}</p>:<><dl>{[
+  {viewTargets.map(a=>{const result=results[a.id];return <article key={a.id} className="livecard"><h3><AppMark id={a.id} name={a.name}/></h3>{!result?<p>연결 상태를 확인하고 있습니다.</p>:result.status==='error'?<p role="status">{result.message}</p>:<><dl>{[
   ['기간 활성 사용자',result.data.activeUsers.toLocaleString()],
   ['일평균 DAU',result.data.averageDau.toLocaleString()],
   ['신규 사용자',(result.data.newUsers??0).toLocaleString()],
@@ -129,7 +136,8 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
  {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 활성 · 신규 사용자</h2><span>GA4 · 앱별</span></div><TrendChart series={[...chartSeries,...newUserSeries]}/></div>}
  <div id="section-map">{!loading&&!!mapSources.length&&<div style={{marginTop:20}}><UsersMap sources={mapSources} title="국가별 사용자"/></div>}</div>
  <div id="section-retention">
- {!loading&&targets.map(a=>{
+  {!loading&&!!retTargets.length&&<div className="sectiontitle marketing-title" style={{marginTop:20}}><div className="marketing-title-row"><h2>리텐션</h2><AppToggle apps={appOpts} allOn={retFilter.allOn} selected={retFilter.selected} onSelectAll={retFilter.selectAll} onToggle={retFilter.toggle} label="리텐션 앱"/></div><span>{retFilter.label}</span></div>}
+ {!loading&&retTargets.map(a=>{
   const r=results[a.id];if(!r||r.status!=='success')return null;
   const ret=r.data.retention;
   if(ret&&ret.rows.length){

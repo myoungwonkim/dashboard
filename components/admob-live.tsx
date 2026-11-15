@@ -6,6 +6,7 @@ import {formatLabel} from '@/lib/admob-core.mts';
 import {sumNums} from '@/lib/metric-rollups.mts';
 import TrendChart from './trend-chart';
 import MetricTable from './metric-table';
+import AppToggle,{useAppFilter} from './app-toggle';
 type AdUnitRow={adUnitId:string;name:string;format:string;formatLabel?:string;revenue:number;impressions:number;clicks:number;ecpm:number;ctr:number;adRequests:number;matchedRequests:number};
 type Data={
  revenue:number;impressions:number;clicks:number;ecpm:number;ctr?:number;currency:string;timeZone:string;fetchedAt:string;limited:boolean;
@@ -38,17 +39,21 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os,sh
   if(active){setResults(p=>({...p,[a.id]:result}));setUsers(p=>({...p,[a.id]:ga4}));}
  })).finally(()=>{if(active)setLoading(false);});return ()=>{active=false;c.abort();};},[app,days,startDate,endDate,country,os,targets.map(t=>t.id).join(',')]);
  const ok=useMemo(()=>targets.map(a=>{const r=results[a.id];return r?.status==='success'?{app:a,data:r.data,users:users[a.id]||null}:null;}).filter(Boolean) as {app:AppRecord;data:Data;users:Ga4Users|null}[],[targets,results,users]);
+ const appOpts=useMemo(()=>targets.map(a=>({id:a.id,name:a.name})),[targets]);
+ const filter=useAppFilter(appOpts);
+ const viewTargets=useMemo(()=>targets.filter(a=>filter.includes(a.id)),[targets,filter.selected,filter.allOn]);
+ const viewOk=useMemo(()=>ok.filter(o=>filter.includes(o.app.id)),[ok,filter.selected,filter.allOn]);
  const totals=useMemo(()=>{
-  if(ok.length<2)return null;
-  const revenue=sumNums(ok.map(o=>o.data.revenue))!;
-  const impressions=sumNums(ok.map(o=>o.data.impressions))!;
-  const clicks=sumNums(ok.map(o=>o.data.clicks))!;
-  const adRequests=sumNums(ok.map(o=>o.data.adRequests??0))!;
-  const matched=sumNums(ok.map(o=>o.data.matchedRequests??0))!;
-  const activeUsers=sumNums(ok.map(o=>o.users?.activeUsers??null));
-  const averageDau=sumNums(ok.map(o=>o.users?.averageDau??null));
+  if(viewOk.length<2)return null;
+  const revenue=sumNums(viewOk.map(o=>o.data.revenue))!;
+  const impressions=sumNums(viewOk.map(o=>o.data.impressions))!;
+  const clicks=sumNums(viewOk.map(o=>o.data.clicks))!;
+  const adRequests=sumNums(viewOk.map(o=>o.data.adRequests??0))!;
+  const matched=sumNums(viewOk.map(o=>o.data.matchedRequests??0))!;
+  const activeUsers=sumNums(viewOk.map(o=>o.users?.activeUsers??null));
+  const averageDau=sumNums(viewOk.map(o=>o.users?.averageDau??null));
   return {
-   revenue,impressions,clicks,adRequests,matchedRequests:matched,n:ok.length,
+   revenue,impressions,clicks,adRequests,matchedRequests:matched,n:viewOk.length,
    matchRate:adRequests?matched/adRequests:0,
    showRate:matched?impressions/matched:0,
    ecpm:impressions?revenue/impressions*1000:0,
@@ -56,14 +61,14 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os,sh
    arpu:adArpu(revenue,activeUsers),
    arpdau:adArpdau(revenue,averageDau,days),
   };
- },[ok,days]);
- const chartSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];return [{name:a.name+' 수익',color:appColor(a.id),points:r.data.daily.map(d=>({date:d.date,value:d.revenue}))}];});
- const arpdauSeries=targets.flatMap(a=>{
+ },[viewOk,days]);
+ const chartSeries=viewTargets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];return [{name:a.name+' 수익',color:appColor(a.id),points:r.data.daily.map(d=>({date:d.date,value:d.revenue}))}];});
+ const arpdauSeries=viewTargets.flatMap(a=>{
   const r=results[a.id];const g=users[a.id];if(!r||r.status!=='success'||!g)return [];
   const byDate=new Map(g.daily.map(d=>[d.date,d.active]));
   return [{name:a.name+' ARPDAU',color:appColor(a.id),dashed:true as const,points:r.data.daily.map(d=>{const dau=byDate.get(d.date)||0;return {date:d.date,value:dau>0?d.revenue/dau:0};})}];
  });
- return <section className="ga4live" id="section-admob"><div className="sectiontitle"><h2>AdMob 광고 수익</h2><span>{loading?'조회 중…':'AdMob · USD'}</span></div><p className="note">AdMob 네트워크 보고서 · USD · {startDate} ~ {endDate} ({days}일) · 합산=수익·노출 합 · eCPM/CTR/ARPU=합산 후 재계산 · 점선=ARPDAU</p>
+ return <section className="ga4live" id="section-admob"><div className="sectiontitle marketing-title"><div className="marketing-title-row"><h2>AdMob 광고 수익</h2><AppToggle apps={appOpts} allOn={filter.allOn} selected={filter.selected} onSelectAll={filter.selectAll} onToggle={filter.toggle} label="AdMob 앱"/></div><span>{loading?'조회 중…':filter.label}</span></div><p className="note">AdMob 네트워크 보고서 · USD · {startDate} ~ {endDate} ({days}일) · 합산=수익·노출 합 · eCPM/CTR/ARPU=합산 후 재계산 · {filter.label}</p>
  {!targets.length?<p className="note">AdMob 앱 ID가 등록된 앱이 없습니다.</p>:<div className="livegrid" aria-live="polite">
   {totals&&!loading&&<article className="livecard aggregate"><h3>전체 합산 · 재계산 <small>{totals.n}개 앱</small></h3><dl>{[
    ['예상 광고 수익 합','$'+totals.revenue.toFixed(2)],
@@ -78,7 +83,7 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os,sh
    ['eCPM','$'+totals.ecpm.toFixed(2)],
    ['CTR',(totals.ctr*100).toFixed(2)+'%'],
   ].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><small>수익·노출·클릭은 합산, eCPM/CTR/ARPU는 합산값으로 다시 계산합니다.</small></article>}
-  {targets.map(a=>{const r=results[a.id];const g=users[a.id];const ctr=r&&r.status==='success'?(r.data.ctr??(r.data.impressions?r.data.clicks/r.data.impressions:0)):0;const arpu=r&&r.status==='success'?adArpu(r.data.revenue,g?.activeUsers):null;const arpdau=r&&r.status==='success'?adArpdau(r.data.revenue,g?.averageDau,days):null;return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3>{!r?<p>수익 조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">데이터 연결 확인 →</a></>:<><dl>{[
+  {viewTargets.map(a=>{const r=results[a.id];const g=users[a.id];const ctr=r&&r.status==='success'?(r.data.ctr??(r.data.impressions?r.data.clicks/r.data.impressions:0)):0;const arpu=r&&r.status==='success'?adArpu(r.data.revenue,g?.activeUsers):null;const arpdau=r&&r.status==='success'?adArpdau(r.data.revenue,g?.averageDau,days):null;return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3>{!r?<p>수익 조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">데이터 연결 확인 →</a></>:<><dl>{[
   ['예상 광고 수익','$'+r.data.revenue.toFixed(2)],
   ['유저당 수익(ARPU)',fmtUsd(arpu)],
   ['일평균 ARPDAU',fmtUsd(arpdau)],
@@ -93,7 +98,7 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os,sh
  ].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><small>시간대 {r.data.timeZone} · 조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST · ARPU=수익/기간활성{g?`(${g.activeUsers.toLocaleString()})`:''}</small>{r.data.limited&&<p>보고서에 제한 또는 누락 경고가 있습니다.</p>}</>}</article>;})}
  </div>}
  {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 예상 수익 · ARPDAU</h2><span>AdMob · 앱별</span></div><TrendChart series={[...chartSeries,...arpdauSeries]}/></div>}
- {!loading&&targets.map(a=>{
+ {!loading&&viewTargets.map(a=>{
   const r=results[a.id];if(!r||r.status!=='success')return null;
   const g=users[a.id];const active=g?.activeUsers;
   const units=r.data.adUnits||[];

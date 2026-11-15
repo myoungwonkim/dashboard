@@ -1,6 +1,7 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useMemo,useState} from 'react';
 import countries,{VIEW_BOX} from 'world-map-country-shapes';
 import MetricTable from './metric-table';
+import AppToggle,{useAppFilter} from './app-toggle';
 
 export type CountryUsers={countryId:string;country:string;activeUsers:number;newUsers:number};
 export type CountryAppSource={id:string;name:string;countries:CountryUsers[]};
@@ -12,11 +13,10 @@ function shade(t:number){
  return `hsl(40 6% ${l}%)`;
 }
 
-function aggregateCountries(sources:CountryAppSource[],selected:Set<string>):CountryUsers[]{
- const allOn=!selected.size||selected.size===sources.length;
+function aggregateCountries(sources:CountryAppSource[],includes:(id:string)=>boolean):CountryUsers[]{
  const map=new Map<string,CountryUsers>();
  for(const s of sources){
-  if(!allOn&&!selected.has(s.id))continue;
+  if(!includes(s.id))continue;
   for(const c of s.countries||[]){
    const id=(c.countryId||'').toUpperCase();
    if(!/^[A-Z]{2}$/.test(id))continue;
@@ -29,15 +29,12 @@ function aggregateCountries(sources:CountryAppSource[],selected:Set<string>):Cou
 }
 
 export default function UsersMap({sources,title='국가별 사용자'}:{sources:CountryAppSource[];title?:string}){
- const appIds=useMemo(()=>sources.map(s=>s.id),[sources]);
- const [selected,setSelected]=useState<Set<string>>(()=>new Set(appIds));
+ const appOpts=useMemo(()=>sources.map(s=>({id:s.id,name:s.name})),[sources]);
+ const filter=useAppFilter(appOpts);
  const [metric,setMetric]=useState<Metric>('active');
  const [hover,setHover]=useState<{id:string;x:number;y:number}|null>(null);
 
- useEffect(()=>{setSelected(new Set(appIds));},[appIds.join(',')]);
-
- const allOn=!selected.size||selected.size===appIds.length;
- const rows=useMemo(()=>aggregateCountries(sources,selected),[sources,selected]);
+ const rows=useMemo(()=>aggregateCountries(sources,filter.includes),[sources,filter.selected,filter.allOn]);
  const byId=useMemo(()=>{
   const map=new Map<string,CountryUsers>();
   for(const r of rows)map.set(r.countryId,r);
@@ -49,17 +46,6 @@ export default function UsersMap({sources,title='국가별 사용자'}:{sources:
   return m;
  },[rows,metric]);
  const tip=hover?byId.get(hover.id):undefined;
- const scopeLabel=allOn?(sources.length>1?'앱 합산':'이 앱'):sources.filter(s=>selected.has(s.id)).map(s=>s.name).join(' · ');
-
- function selectAll(){setSelected(new Set(appIds));}
- function toggleApp(id:string){
-  setSelected(prev=>{
-   const next=new Set(prev);
-   if(next.has(id))next.delete(id);else next.add(id);
-   if(!next.size)return new Set(appIds);
-   return next;
-  });
- }
 
  if(!sources.some(s=>s.countries?.length))return null;
 
@@ -67,20 +53,14 @@ export default function UsersMap({sources,title='국가별 사용자'}:{sources:
   <div className="sectiontitle marketing-title">
    <div className="marketing-title-row">
     <h2>{title}</h2>
-    {sources.length>1&&<div className="channel-window" role="group" aria-label="지도 앱(복수 선택)">
-     <button type="button" className={'channel-seg'+(allOn?' on':'')} aria-pressed={allOn} onClick={selectAll}>전체</button>
-     {sources.map(s=>{
-      const on=selected.has(s.id);
-      return <button type="button" key={s.id} className={'channel-seg'+(on?' on':'')} aria-pressed={on} onClick={()=>toggleApp(s.id)} title={s.name}>{s.name}</button>;
-     })}
-    </div>}
+    <AppToggle apps={appOpts} allOn={filter.allOn} selected={filter.selected} onSelectAll={filter.selectAll} onToggle={filter.toggle} label="지도 앱"/>
    </div>
    <div className="charttype" role="group" aria-label="지도 지표">
     <button type="button" className={metric==='active'?'selected':''} aria-pressed={metric==='active'} onClick={()=>setMetric('active')}>활성</button>
     <button type="button" className={metric==='new'?'selected':''} aria-pressed={metric==='new'} onClick={()=>setMetric('new')}>신규</button>
    </div>
   </div>
-  <p className="note">진할수록 {metric==='active'?'활성':'신규'} 사용자가 많습니다 · {scopeLabel} · 오른쪽 표는 같은 데이터입니다.</p>
+  <p className="note">진할수록 {metric==='active'?'활성':'신규'} 사용자가 많습니다 · {filter.label} · 오른쪽 표는 같은 데이터입니다.</p>
   {!rows.length?<p className="note">선택한 앱의 국가 데이터가 없습니다.</p>:
   <div className="users-map-split">
    <div className="users-map-col">

@@ -17,6 +17,7 @@ import ConnectionsPage from './connections-page';
 import PagePicker from './page-picker';
 import MetricTable,{type MetricCol} from './metric-table';
 import SectionJumps,{type SectionJump} from './section-jumps';
+import AppToggle,{useAppFilter} from './app-toggle';
 import {adArpu,fmtUsd} from '@/lib/arpu.mts';
 const tasks=[
 ['화면 구조와 디자인 확정','완료','B 앱 비교형 메인 / C 서비스별 분석형 앱 상세. 흑백·회색 중심.'],
@@ -75,9 +76,12 @@ export default function Dashboard({page}:{page:string}){
  const needsSetup=!ga4Verified||!admobVerified||apps.some(a=>!a.androidPkg)||!playSetup?.gcsBucket;
  const overviewGa4Errors=apps.map(a=>compare[a.id]?.ga4Error?`${a.name}: ${compare[a.id]!.ga4Error}`:'').filter(Boolean);
  const playInstallGap=apps.some(a=>a.androidPkg&&compare[a.id]?.store&&compare[a.id]!.store!.playInstalls==null);
+ const compareAppOpts=useMemo(()=>apps.map(a=>({id:a.id,name:a.name})),[apps]);
+ const compareFilter=useAppFilter(compareAppOpts);
+ const compareApps=useMemo(()=>apps.filter(a=>compareFilter.includes(a.id)),[apps,compareFilter.selected,compareFilter.allOn]);
  const totals=useMemo(()=>{
   let dau=0,play=0,rev=0,users=0,spend=0,dauN=0,playN=0,revN=0,userN=0,spendN=0;
-  for(const a of apps){
+  for(const a of compareApps){
    const row=compare[a.id];
    if(row?.ga4){dau+=row.ga4.averageDau;dauN++;users+=row.ga4.activeUsers;userN++;}
    if(row?.store?.playInstalls!=null){play+=row.store.playInstalls;playN++;}
@@ -85,7 +89,7 @@ export default function Dashboard({page}:{page:string}){
    if(row?.spend!=null){spend+=row.spend;spendN++;}
   }
   return {dau,play,rev,users,spend,dauN,playN,revN,userN,spendN,arpu:adArpu(revN&&userN?rev:null,userN?users:null),roas:spend>0&&revN?rev/spend:null};
- },[apps,compare]);
+ },[compareApps,compare]);
  const revenueByApp=useMemo(()=>{
   const out:Record<string,number|undefined>={};
   for(const a of apps)out[a.id]=compare[a.id]?.admob?.revenue;
@@ -239,15 +243,15 @@ export default function Dashboard({page}:{page:string}){
  <div className="filterbar"><DateRangePicker value={dateRange} onChange={setDateRange}/><label>국가<select aria-label="국가" value={country} onChange={e=>setCountry(e.target.value)}>{COUNTRY_OPTIONS.map(o=><option key={o.code} value={o.code}>{o.label}</option>)}</select></label><label>OS<select aria-label="OS" value={os} onChange={e=>setOs(e.target.value)}><option value="all">전체 OS</option><option value="android">Android</option><option value="ios">iOS</option></select></label><span className="range">각 서비스 시간대 기준 · {days}일</span></div>
 
  {page==='overview'&&!!apps.length&&<>
+  <div className="sectiontitle marketing-title" id="section-compare"><div className="marketing-title-row"><h2>앱 비교</h2><AppToggle apps={compareAppOpts} allOn={compareFilter.allOn} selected={compareFilter.selected} onSelectAll={compareFilter.selectAll} onToggle={compareFilter.toggle} label="비교 앱"/></div><span>{compareFilter.label} · 행 클릭 시 상세</span></div>
   <div className="metrics overviewkpi" aria-label="핵심 합계">
-   <div className="metric"><span>평균 DAU 합</span><strong>{totals.dauN?Math.round(totals.dau).toLocaleString():'—'}</strong><small>GA4 · 앱 {totals.dauN}/{apps.length}</small></div>
-   <div className="metric"><span>Play 설치 합</span><strong>{totals.playN?totals.play.toLocaleString():'—'}</strong><small>{playSetup?.gcsBucket?'GCS/배치':'버킷 미등록'} · 앱 {totals.playN}/{apps.filter(a=>a.androidPkg).length}</small></div>
-   <div className="metric"><span>광고 수익 합</span><strong>{totals.revN?'$'+totals.rev.toFixed(2):'—'}</strong><small>AdMob · 앱 {totals.revN}/{apps.length}</small></div>
-   <div className="metric"><span>마케팅 비용</span><strong>{totals.spendN?'$'+totals.spend.toFixed(2):'—'}</strong><small>Ads · 수동 · 앱 {totals.spendN}/{apps.length}</small></div>
+   <div className="metric"><span>평균 DAU 합</span><strong>{totals.dauN?Math.round(totals.dau).toLocaleString():'—'}</strong><small>GA4 · 앱 {totals.dauN}/{compareApps.length}</small></div>
+   <div className="metric"><span>Play 설치 합</span><strong>{totals.playN?totals.play.toLocaleString():'—'}</strong><small>{playSetup?.gcsBucket?'GCS/배치':'버킷 미등록'} · 앱 {totals.playN}/{compareApps.filter(a=>a.androidPkg).length}</small></div>
+   <div className="metric"><span>광고 수익 합</span><strong>{totals.revN?'$'+totals.rev.toFixed(2):'—'}</strong><small>AdMob · 앱 {totals.revN}/{compareApps.length}</small></div>
+   <div className="metric"><span>마케팅 비용</span><strong>{totals.spendN?'$'+totals.spend.toFixed(2):'—'}</strong><small>Ads · 수동 · 앱 {totals.spendN}/{compareApps.length}</small></div>
    <div className="metric"><span>ROAS</span><strong>{totals.roas!=null?totals.roas.toFixed(2)+'x':'—'}</strong><small>AdMob÷마케팅 비용</small></div>
-   <div className="metric"><span>유저당 광고 수익</span><strong>{fmtUsd(totals.arpu)}</strong><small>AdMob÷GA4 활성 · 앱 합산</small></div>
+   <div className="metric"><span>유저당 광고 수익</span><strong>{fmtUsd(totals.arpu)}</strong><small>AdMob÷GA4 활성 · {compareFilter.label}</small></div>
   </div>
-  <div className="sectiontitle" id="section-compare"><h2>앱 비교</h2><span>같은 필터 · 행 클릭 시 상세</span></div>
  </>}
  {!!current&&(()=>{
   const row=compare[current.id];
@@ -266,7 +270,7 @@ export default function Dashboard({page}:{page:string}){
   </div>;
  })()}
  {page==='overview'&&appsLoaded&&!apps.length&&!appsError&&<div className="empty"><h2>등록된 앱이 없습니다</h2><p>Connections에서 앱을 추가하세요.</p><p className="note"><Link href="/connections">데이터 연결로 이동</Link></p></div>}
- {page==='overview'&&!!apps.length&&<MetricTable rows={apps} columns={compareCols} rowKey={a=>a.id} wrapClassName="tablewrap comparewrap" defaultSort={{key:'dau',dir:'desc'}} onRowClick={a=>router.push(`/apps/${a.id}`)} rowTitle={a=>{const row=compare[a.id];return row?.ga4?`세션 ${row.ga4.sessions.toLocaleString()} · 활성 ${row.ga4.activeUsers.toLocaleString()}${row?.admob?` · CTR ${(row.admob.ctr*100).toFixed(2)}%`:''}`:undefined;}}/>}
+ {page==='overview'&&!!compareApps.length&&<MetricTable rows={compareApps} columns={compareCols} rowKey={a=>a.id} wrapClassName="tablewrap comparewrap" defaultSort={{key:'dau',dir:'desc'}} onRowClick={a=>router.push(`/apps/${a.id}`)} rowTitle={a=>{const row=compare[a.id];return row?.ga4?`세션 ${row.ga4.sessions.toLocaleString()} · 활성 ${row.ga4.activeUsers.toLocaleString()}${row?.admob?` · CTR ${(row.admob.ctr*100).toFixed(2)}%`:''}`:undefined;}}/>}
 
  {page==='overview'&&!!apps.length&&<OverviewCombined apps={apps} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}
  {!!current&&<OverviewCombined apps={[current]} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}

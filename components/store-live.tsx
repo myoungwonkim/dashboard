@@ -5,6 +5,7 @@ import {meanNums,sumNums} from '@/lib/metric-rollups.mts';
 import TrendChart from './trend-chart';
 import {recentAppVersions} from '@/lib/app-version.mts';
 import MetricTable from './metric-table';
+import AppToggle,{useAppFilter} from './app-toggle';
 function AppMark({id,name}:{id:string;name:string}){
  return <span className="apptitle"><span className="appdot" style={{background:appColor(id)}} aria-hidden/>{name}</span>;
 }
@@ -43,11 +44,21 @@ export default function StoreLive({apps,app,days,startDate,endDate,showCharts=tr
   Promise.all(tasks).finally(()=>{if(active)setLoading(false);});
   return ()=>{active=false;c.abort();};
  },[app,days,startDate,endDate,playTargets.map(t=>t.id).join(','),ascTargets.map(t=>t.id).join(',')]);
- const playCharts=playTargets.flatMap(a=>{const r=play[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 설치',color:appColor(a.id),points:r.data.daily.map(d=>({date:d.date,value:d.installs}))}];});
- const ascCharts=ascTargets.flatMap(a=>{const r=asc[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' iOS',color:appColor(a.id),dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.downloads}))}];});
+ const storeApps=useMemo(()=>{
+  const map=new Map<string,AppRecord>();
+  for(const a of playTargets)map.set(a.id,a);
+  for(const a of ascTargets)map.set(a.id,a);
+  return [...map.values()];
+ },[playTargets,ascTargets]);
+ const appOpts=useMemo(()=>storeApps.map(a=>({id:a.id,name:a.name})),[storeApps]);
+ const filter=useAppFilter(appOpts);
+ const viewPlay=useMemo(()=>playTargets.filter(a=>filter.includes(a.id)),[playTargets,filter.selected,filter.allOn]);
+ const viewAsc=useMemo(()=>ascTargets.filter(a=>filter.includes(a.id)),[ascTargets,filter.selected,filter.allOn]);
+ const playCharts=viewPlay.flatMap(a=>{const r=play[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 설치',color:appColor(a.id),points:r.data.daily.map(d=>({date:d.date,value:d.installs}))}];});
+ const ascCharts=viewAsc.flatMap(a=>{const r=asc[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' iOS',color:appColor(a.id),dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.downloads}))}];});
  const detailPlay=app?play[app]:undefined;const detailAsc=app?asc[app]:undefined;
- const playOk=useMemo(()=>playTargets.map(a=>{const r=play[a.id];return r?.status==='success'?r.data:null;}).filter(Boolean) as PlayData[],[playTargets,play]);
- const ascOk=useMemo(()=>ascTargets.map(a=>{const r=asc[a.id];return r?.status==='success'?r.data:null;}).filter(Boolean) as AscData[],[ascTargets,asc]);
+ const playOk=useMemo(()=>viewPlay.map(a=>{const r=play[a.id];return r?.status==='success'?r.data:null;}).filter(Boolean) as PlayData[],[viewPlay,play]);
+ const ascOk=useMemo(()=>viewAsc.map(a=>{const r=asc[a.id];return r?.status==='success'?r.data:null;}).filter(Boolean) as AscData[],[viewAsc,asc]);
  const storeTotals=useMemo(()=>{
   if(playOk.length+ascOk.length<2)return null;
   const playInstalls=sumNums(playOk.map(d=>d.installs));
@@ -64,8 +75,8 @@ export default function StoreLive({apps,app,days,startDate,endDate,showCharts=tr
   };
  },[playOk,ascOk]);
  return <section className="ga4live" id="section-store">
-  <div className="sectiontitle"><h2>스토어 · 유입 본선</h2><span>{loading?'조회 중…':'Play · ASC'}</span></div>
-  <p className="note">Play 설치·ASC 다운로드가 유입 1순위입니다. 합산=설치·다운로드 합 · 전환율=앱 평균 · 실선=Play, 점선=ASC</p>
+  <div className="sectiontitle marketing-title"><div className="marketing-title-row"><h2>스토어 · 유입 본선</h2><AppToggle apps={appOpts} allOn={filter.allOn} selected={filter.selected} onSelectAll={filter.selectAll} onToggle={filter.toggle} label="스토어 앱"/></div><span>{loading?'조회 중…':filter.label}</span></div>
+  <p className="note">Play 설치·ASC 다운로드가 유입 1순위입니다. 합산=설치·다운로드 합 · 전환율=앱 평균 · {filter.label}</p>
   <div className="livegrid" aria-live="polite">
    {storeTotals&&!loading&&<article className="livecard aggregate"><h3>전체 합산 · 평균 <small>Play {storeTotals.playN} · ASC {storeTotals.ascN}</small></h3><dl>{[
     ['Play 설치 합',storeTotals.playInstalls==null?'—':storeTotals.playInstalls.toLocaleString()],
@@ -76,7 +87,7 @@ export default function StoreLive({apps,app,days,startDate,endDate,showCharts=tr
     ['Play 전환율(평균)',storeTotals.playConv==null?'—':(storeTotals.playConv*100).toFixed(1)+'%'],
     ['ASC 전환율(평균)',storeTotals.ascConv==null?'—':(storeTotals.ascConv*100).toFixed(1)+'%'],
    ].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><small>설치·다운로드·방문은 합산, 전환율은 앱 단순 평균입니다.</small></article>}
-   {playTargets.map(a=>{const r=play[a.id];return <article className="livecard" key={'play-'+a.id}><h3><AppMark id={a.id} name={a.name}/> · Play</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
+   {viewPlay.map(a=>{const r=play[a.id];return <article className="livecard" key={'play-'+a.id}><h3><AppMark id={a.id} name={a.name}/> · Play</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
     <div><dt>패키지</dt><dd>{r.data.packageName}</dd></div>
     <div><dt>설치 (기간)</dt><dd>{r.data.installs==null?<a href="/connections">배치 대기</a>:r.data.installs.toLocaleString()}</dd></div>
     <div><dt>삭제</dt><dd>{r.data.uninstalls==null?'—':r.data.uninstalls.toLocaleString()}</dd></div>
@@ -87,7 +98,7 @@ export default function StoreLive({apps,app,days,startDate,endDate,showCharts=tr
    </dl><SpikeNote spike={r.data.spike}/>{r.data.note&&<p className="note">{r.data.note}</p>}<small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</small>
    {!!r.data.reviews.length&&<div className="tablewrap" style={{marginTop:12}}><table className="dense"><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td className="cell-text">{v.text||v.author}</td></tr>)}</tbody></table></div>}
    </>}</article>;})}
-   {ascTargets.map(a=>{const r=asc[a.id];return <article className="livecard" key={'asc-'+a.id}><h3><AppMark id={a.id} name={a.name}/> · App Store</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">ASC 연결 →</a></>:<><dl>
+   {viewAsc.map(a=>{const r=asc[a.id];return <article className="livecard" key={'asc-'+a.id}><h3><AppMark id={a.id} name={a.name}/> · App Store</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">ASC 연결 →</a></>:<><dl>
     <div><dt>Apple ID</dt><dd>{r.data.appleAppId}</dd></div>
     <div><dt>번들</dt><dd>{r.data.bundleId||'—'}</dd></div>
     <div><dt>다운로드</dt><dd>{r.data.downloads==null?'배치 대기':r.data.downloads.toLocaleString()}</dd></div>
