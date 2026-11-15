@@ -84,8 +84,13 @@
 .chart-toggle:focus-visible{outline:2px solid #777;outline-offset:2px}
 .overview-combined{margin:28px 0 8px}
 .users-map{margin-top:0}
-.users-map-frame{position:relative;width:100%;margin-top:8px;background:#f7f7f5;border:1px solid #eee;border-radius:10px;overflow:hidden}
+.users-map-split{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(240px,.85fr);gap:16px;align-items:stretch;margin-top:4px}
+.users-map-col{min-width:0;display:flex;flex-direction:column}
+.users-map-table{min-height:0}
+.users-map-tablewrap{max-height:min(420px,55vh);overflow:auto;overscroll-behavior:contain;flex:1}
+.users-map-frame{position:relative;width:100%;margin-top:0;background:#f7f7f5;border:1px solid #eee;border-radius:10px;overflow:hidden;flex:1}
 .users-map-svg{display:block;width:100%;height:auto;max-height:420px}
+@media(max-width:900px){.users-map-split{grid-template-columns:1fr}}
 .users-map-country{cursor:default;transition:fill .12s ease}
 .users-map-country.has{cursor:pointer}
 .users-map-country.has:hover{stroke:#333;stroke-width:1.5}
