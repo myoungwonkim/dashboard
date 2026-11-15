@@ -6,6 +6,9 @@ import {retentionTotals} from '@/lib/ga4-cohort.mts';
 import TrendChart from './trend-chart';
 import UsersMap,{type CountryUsers} from './users-map';
 import {recentAppVersions} from '@/lib/app-version.mts';
+import MetricTable from './metric-table';
+import SortTh from './sort-th';
+import {sortBy,type SortDir,type SortState} from '@/lib/table-sort.mts';
 type Daily={date:string,active:number,newUsers?:number,sessions?:number};
 type Retention={summary:{d1:number|null;d7:number|null;d14:number|null;d30:number|null;cohorts:number;endOffset:number};rows:{cohort:string;users:number;rates:Record<number,number|null>}[];offsets:number[]};
 type Data={
@@ -27,6 +30,28 @@ function heat(rate:number|null){
  if(rate==null)return undefined;
  const t=Math.max(0,Math.min(1,rate));
  return {background:`rgba(29,78,216,${0.08+t*0.55})`};
+}
+function RetentionTable({rows,offs,period}:{rows:{cohort:string;users:number;rates:Record<number,number|null>}[];offs:number[];period:{users:number;rates:Record<number,number|null>}}){
+ const [sort,setSort]=useState<SortState|null>({key:'cohort',dir:'desc'});
+ const getters=useMemo(()=>{
+  const g:Record<string,(row:{cohort:string;users:number;rates:Record<number,number|null>})=>string|number|null|undefined>={
+   cohort:r=>r.cohort,
+   users:r=>r.users,
+  };
+  for(const d of offs)g[`d${d}`]=r=>r.rates[d]??null;
+  return g;
+ },[offs]);
+ const sorted=useMemo(()=>sortBy(rows,sort,getters),[rows,sort,getters]);
+ function onSort(key:string,dir:SortDir){setSort(prev=>prev?.key===key&&prev.dir===dir?null:{key,dir});}
+ return <div className="tablewrap retentionwrap"><table className="retention dense"><thead><tr>
+  <SortTh label="첫 세션" sortKey="cohort" sort={sort} onSort={onSort}/>
+  <SortTh label="규모" sortKey="users" sort={sort} onSort={onSort}/>
+  {offs.map(d=><SortTh key={d} label={`D${d}`} sortKey={`d${d}`} sort={sort} onSort={onSort} title={d===0?'당일':d===1?'다음날':`${d}일 후`}/>)}
+ </tr></thead>
+ <tbody>
+  <tr className="retention-total"><td>기간 종합</td><td>{period.users?period.users.toLocaleString():'—'}</td>{offs.map(d=>{const v=period.rates[d]??null;return <td key={d} style={heat(v)}>{fmtRate(v)}</td>;})}</tr>
+  {sorted.map(row=><tr key={row.cohort}><td>{fmtCohort(row.cohort)}</td><td>{row.users?row.users.toLocaleString():'—'}</td>{offs.map(d=>{const v=row.rates[d]??null;return <td key={d} style={heat(v)}>{fmtRate(v)}</td>;})}</tr>)}
+ </tbody></table></div>;
 }
 const SHOW_OFFSETS=[0,1,3,7,14,30];
 function AppMark({id,name}:{id:string;name:string}){
@@ -120,19 +145,25 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
    const period=retentionTotals(ret.rows,offs);
    return <div className="panel" style={{marginTop:20}} key={a.id+'-ret'}><div className="sectiontitle"><h2><AppMark id={a.id} name={a.name}/> · 리텐션</h2><span>D0–D{ret.summary.endOffset} · {ret.summary.cohorts}코호트</span></div>
     <p className="note">행=그날에 처음 연 사용자 · 열 Dn=n일 뒤 활성 비율 · 상단 종합=코호트 규모 가중 평균. D1 {fmtRate(ret.summary.d1)} · D7 {fmtRate(ret.summary.d7)} · D14 {fmtRate(ret.summary.d14)} · D30 {fmtRate(ret.summary.d30)}{r.data.retentionNote?` · ${r.data.retentionNote}`:''}</p>
-    <div className="tablewrap retentionwrap"><table className="retention dense"><thead><tr><th>첫 세션</th><th>규모</th>{offs.map(d=><th key={d} title={d===0?'당일':d===1?'다음날':`${d}일 후`}>D{d}</th>)}</tr></thead>
-    <tbody>
-     <tr className="retention-total"><td>기간 종합</td><td>{period.users?period.users.toLocaleString():'—'}</td>{offs.map(d=>{const v=period.rates[d]??null;return <td key={d} style={heat(v)}>{fmtRate(v)}</td>;})}</tr>
-     {ret.rows.map(row=><tr key={row.cohort}><td>{fmtCohort(row.cohort)}</td><td>{row.users?row.users.toLocaleString():'—'}</td>{offs.map(d=>{const v=row.rates[d]??null;return <td key={d} style={heat(v)}>{fmtRate(v)}</td>;})}</tr>)}
-    </tbody></table></div>
+    <RetentionTable rows={ret.rows} offs={offs} period={period}/>
    </div>;
   }
   return <p className="note" key={a.id+'-ret-miss'}><AppMark id={a.id} name={a.name}/>: {r.data.retentionNote||'리텐션을 불러오지 못했습니다.'}</p>;
  })}
  {detailData&&!loading&&!!(detailData.firstUser?.length||detailData.countries?.length||detailData.versions?.length)&&<div className={'detail-grid'+(detailData.firstUser?.length&&detailData.countries?.length&&detailData.versions?.length?' cols-3':'')}>
- {!!detailData.firstUser?.length&&<div className="panel"><div className="sectiontitle"><h2>유입</h2><span>Top 10</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>소스 / 매체</th><th>신규</th></tr></thead><tbody>{detailData.firstUser.map(r=><tr key={r.source+'/'+r.medium}><td className="cell-text">{r.source} / {r.medium}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
- {!!detailData.countries?.length&&<div className="panel"><div className="sectiontitle"><h2>국가</h2><span>활성 · 신규</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>국가</th><th>활성</th><th>신규</th></tr></thead><tbody>{detailData.countries.map(r=><tr key={r.country}><td className="cell-text">{r.country}</td><td>{r.activeUsers.toLocaleString()}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
- {!!detailData.versions?.length&&<div className="panel"><div className="sectiontitle"><h2>앱 버전</h2><span>최근 · 5행</span></div><div className="tablewrap version-scroll"><table className="dense"><thead><tr><th>버전</th><th>활성</th></tr></thead><tbody>{recentAppVersions(detailData.versions,r=>r.version).map(r=><tr key={r.version}><td className="cell-text">{r.version}</td><td>{r.activeUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
+ {!!detailData.firstUser?.length&&<div className="panel"><div className="sectiontitle"><h2>유입</h2><span>Top 10</span></div><MetricTable rows={detailData.firstUser} rowKey={r=>r.source+'/'+r.medium} defaultSort={{key:'newUsers',dir:'desc'}} columns={[
+  {key:'source',label:'소스 / 매체',className:'cell-text',get:r=>`${r.source} / ${r.medium}`,render:r=>`${r.source} / ${r.medium}`},
+  {key:'newUsers',label:'신규',get:r=>r.newUsers,render:r=>r.newUsers.toLocaleString()},
+ ]}/></div>}
+ {!!detailData.countries?.length&&<div className="panel"><div className="sectiontitle"><h2>국가</h2><span>활성 · 신규</span></div><MetricTable rows={detailData.countries} rowKey={r=>r.country} defaultSort={{key:'activeUsers',dir:'desc'}} columns={[
+  {key:'country',label:'국가',className:'cell-text',get:r=>r.country,render:r=>r.country},
+  {key:'activeUsers',label:'활성',get:r=>r.activeUsers,render:r=>r.activeUsers.toLocaleString()},
+  {key:'newUsers',label:'신규',get:r=>r.newUsers,render:r=>r.newUsers.toLocaleString()},
+ ]}/></div>}
+ {!!detailData.versions?.length&&<div className="panel"><div className="sectiontitle"><h2>앱 버전</h2><span>최근 · 5행</span></div><MetricTable rows={recentAppVersions(detailData.versions,r=>r.version)} rowKey={r=>r.version} wrapClassName="tablewrap version-scroll" defaultSort={null} columns={[
+  {key:'version',label:'버전',className:'cell-text',get:r=>r.version,render:r=>r.version},
+  {key:'activeUsers',label:'활성',get:r=>r.activeUsers,render:r=>r.activeUsers.toLocaleString()},
+ ]}/></div>}
  </div>}
  </>}
  <p className="note">Dn 리텐션은 GA4 firstSessionDate 코호트(그날 첫 세션 유저) 기준입니다. Crash-free는 Crashlytics 연동 속성에만 표시됩니다.</p></section>;

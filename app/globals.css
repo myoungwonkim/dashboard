@@ -97,6 +97,15 @@
 .users-map-scale{flex:1;max-width:180px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl(40 6% 92%),hsl(40 6% 30%))}
 /* ~5 dense rows (+ header); scroll when version list exceeds viewport */
 .version-scroll{max-height:calc(2.6em + 5 * 2.85em);overflow:auto;overscroll-behavior:contain}
+.sortth{display:inline-flex;align-items:center;justify-content:inherit;gap:4px;max-width:100%}
+.sortth-label{min-width:0}
+.sortth-btns{display:inline-flex;flex-direction:column;gap:0;flex-shrink:0;margin-left:2px;vertical-align:middle}
+.sortth-btn{display:inline-flex;align-items:center;justify-content:center;width:14px;height:10px;padding:0;border:0;background:transparent;color:#c4c4c0;cursor:pointer;line-height:0}
+.sortth-btn:hover{color:#666}
+.sortth-btn.on{color:#222}
+.sortth-btn:focus-visible{outline:1px solid #777;outline-offset:1px}
+th .sortth{width:100%}
+td .sortth,th:first-child .sortth{justify-content:flex-start}
 .marketing-title{flex-wrap:wrap;align-items:center;gap:8px 12px}
 .marketing-title-row{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
 .marketing-title-row h2{margin:0}

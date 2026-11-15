@@ -5,6 +5,7 @@ import {adArpu,adArpdau,fmtUsd} from '@/lib/arpu.mts';
 import {formatLabel} from '@/lib/admob-core.mts';
 import {sumNums} from '@/lib/metric-rollups.mts';
 import TrendChart from './trend-chart';
+import MetricTable from './metric-table';
 type AdUnitRow={adUnitId:string;name:string;format:string;formatLabel?:string;revenue:number;impressions:number;clicks:number;ecpm:number;ctr:number;adRequests:number;matchedRequests:number};
 type Data={
  revenue:number;impressions:number;clicks:number;ecpm:number;ctr?:number;currency:string;timeZone:string;fetchedAt:string;limited:boolean;
@@ -103,12 +104,28 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os,sh
   return <div key={a.id+'-break'} style={{marginTop:20}}>
    {!!units.length&&<div className="panel"><div className="sectiontitle"><h2><AppMark id={a.id} name={a.name}/> · 광고 유닛별 수익</h2><span>핵심 지표</span></div>
     <p className="note">유저당 = 유닛 수익 ÷ GA4 기간 활성({active!=null?active.toLocaleString():'—'}명). 노출·CTR은 행에 마우스를 올리면 보입니다.</p>
-    <div className="tablewrap"><table className="dense"><thead><tr><th>이름</th><th>타입</th><th>수익</th><th>유저당</th><th>eCPM</th></tr></thead>
-    <tbody>{units.map(u=><tr key={u.adUnitId+'/'+u.format} title={`${u.adUnitId} · 노출 ${u.impressions.toLocaleString()} · CTR ${(u.ctr*100).toFixed(2)}%`}><td className="cell-text">{u.name===u.adUnitId?<span style={{color:'#888'}}>이름 없음</span>:<strong>{u.name}</strong>}</td><td>{u.formatLabel||u.format}</td><td>${u.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(u.revenue,active))}</td><td>${u.ecpm.toFixed(2)}</td></tr>)}</tbody></table></div>
+    <MetricTable rows={units} rowKey={u=>u.adUnitId+'/'+u.format} defaultSort={{key:'revenue',dir:'desc'}} rowTitle={u=>`${u.adUnitId} · 노출 ${u.impressions.toLocaleString()} · CTR ${(u.ctr*100).toFixed(2)}%`} columns={[
+     {key:'name',label:'이름',className:'cell-text',get:u=>u.name,render:u=>u.name===u.adUnitId?<span style={{color:'#888'}}>이름 없음</span>:<strong>{u.name}</strong>},
+     {key:'format',label:'타입',get:u=>u.formatLabel||u.format,render:u=>u.formatLabel||u.format},
+     {key:'revenue',label:'수익',get:u=>u.revenue,render:u=>`$${u.revenue.toFixed(2)}`},
+     {key:'arpu',label:'유저당',get:u=>adArpu(u.revenue,active),render:u=>fmtUsd(adArpu(u.revenue,active))},
+     {key:'ecpm',label:'eCPM',get:u=>u.ecpm,render:u=>`$${u.ecpm.toFixed(2)}`},
+    ]}/>
    </div>}
    {(showFormats||showCountries)&&<div className="detail-grid" style={{marginTop:units.length?16:0}}>
-    {showFormats&&<div className="panel"><div className="sectiontitle"><h2>광고 타입</h2><span>수익 · 유저당</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>타입</th><th>수익</th><th>유저당</th><th>eCPM</th><th>CTR</th></tr></thead><tbody>{formats.map(f=><tr key={f.format} title={`노출 ${f.impressions.toLocaleString()} · 요청 ${f.adRequests.toLocaleString()} · 매칭 ${f.matchedRequests.toLocaleString()}`}><td>{formatLabel(f.format)}</td><td>${f.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(f.revenue,active))}</td><td>${f.ecpm.toFixed(2)}</td><td>{(f.ctr*100).toFixed(2)}%</td></tr>)}</tbody></table></div></div>}
-    {showCountries&&<div className="panel"><div className="sectiontitle"><h2>국가별 수익</h2><span>Top</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>국가</th><th>수익</th><th>유저당</th><th>eCPM</th></tr></thead><tbody>{r.data.countries!.slice(0,12).map(c=><tr key={c.country} title={`노출 ${c.impressions.toLocaleString()} · CTR ${(c.ctr*100).toFixed(2)}%`}><td className="cell-text">{c.country}</td><td>${c.revenue.toFixed(2)}</td><td>{fmtUsd(adArpu(c.revenue,active))}</td><td>${c.ecpm.toFixed(2)}</td></tr>)}</tbody></table></div></div>}
+    {showFormats&&<div className="panel"><div className="sectiontitle"><h2>광고 타입</h2><span>수익 · 유저당</span></div><MetricTable rows={formats} rowKey={f=>f.format} defaultSort={{key:'revenue',dir:'desc'}} rowTitle={f=>`노출 ${f.impressions.toLocaleString()} · 요청 ${f.adRequests.toLocaleString()} · 매칭 ${f.matchedRequests.toLocaleString()}`} columns={[
+     {key:'format',label:'타입',get:f=>formatLabel(f.format),render:f=>formatLabel(f.format)},
+     {key:'revenue',label:'수익',get:f=>f.revenue,render:f=>`$${f.revenue.toFixed(2)}`},
+     {key:'arpu',label:'유저당',get:f=>adArpu(f.revenue,active),render:f=>fmtUsd(adArpu(f.revenue,active))},
+     {key:'ecpm',label:'eCPM',get:f=>f.ecpm,render:f=>`$${f.ecpm.toFixed(2)}`},
+     {key:'ctr',label:'CTR',get:f=>f.ctr,render:f=>`${(f.ctr*100).toFixed(2)}%`},
+    ]}/></div>}
+    {showCountries&&<div className="panel"><div className="sectiontitle"><h2>국가별 수익</h2><span>Top</span></div><MetricTable rows={r.data.countries!.slice(0,12)} rowKey={c=>c.country} defaultSort={{key:'revenue',dir:'desc'}} rowTitle={c=>`노출 ${c.impressions.toLocaleString()} · CTR ${(c.ctr*100).toFixed(2)}%`} columns={[
+     {key:'country',label:'국가',className:'cell-text',get:c=>c.country,render:c=>c.country},
+     {key:'revenue',label:'수익',get:c=>c.revenue,render:c=>`$${c.revenue.toFixed(2)}`},
+     {key:'arpu',label:'유저당',get:c=>adArpu(c.revenue,active),render:c=>fmtUsd(adArpu(c.revenue,active))},
+     {key:'ecpm',label:'eCPM',get:c=>c.ecpm,render:c=>`$${c.ecpm.toFixed(2)}`},
+    ]}/></div>}
    </div>}
   </div>;
  })}

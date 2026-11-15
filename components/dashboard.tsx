@@ -15,6 +15,7 @@ import MarketingLive from './marketing-live';
 import OverviewCombined from './overview-combined';
 import ConnectionsPage from './connections-page';
 import PagePicker from './page-picker';
+import MetricTable,{type MetricCol} from './metric-table';
 import {adArpu,fmtUsd} from '@/lib/arpu.mts';
 const tasks=[
 ['화면 구조와 디자인 확정','완료','B 앱 비교형 메인 / C 서비스별 분석형 앱 상세. 흑백·회색 중심.'],
@@ -158,6 +159,17 @@ export default function Dashboard({page}:{page:string}){
   }
   return '…';
  }
+ const compareCols=useMemo(():MetricCol<AppRecord>[]=>[
+  {key:'name',label:'앱',get:a=>a.name,render:a=>{const row=compare[a.id];return <div className="applink"><AppIcon app={a}/><span><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}<small>{a.androidPkg||a.id}{row?.store?.playSource?` · ${row.store.playSource}`:''}{row?.ga4Error?' · GA4 오류':''}</small></span></div>;}},
+  {key:'dau',label:'DAU',get:a=>compare[a.id]?.ga4?.averageDau??null,render:a=>{const row=compare[a.id];return row?.ga4?row.ga4.averageDau.toLocaleString():'—';}},
+  {key:'play',label:'Play',get:a=>compare[a.id]?.store?.playInstalls??null,render:a=>playCell(a,compare[a.id])},
+  {key:'asc',label:'ASC',get:a=>compare[a.id]?.store?.ascDownloads??null,render:a=>{const row=compare[a.id];const ascPending=!!a.appleAppId&&!!row?.store&&row.store.ascDownloads==null;return row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():ascPending?<span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">배치 대기</Link></span>:(a.appleAppId?'—':'iOS 미출시');}},
+  {key:'rev',label:'수익',get:a=>compare[a.id]?.admob?.revenue??null,render:a=>{const row=compare[a.id];return row?.admob?'$'+row.admob.revenue.toFixed(2):'—';}},
+  {key:'spend',label:'비용',get:a=>compare[a.id]?.spend??null,render:a=>{const row=compare[a.id];return row?.spend!=null?'$'+row.spend.toFixed(2):'—';}},
+  {key:'roas',label:'ROAS',get:a=>{const row=compare[a.id];return row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;},render:a=>{const row=compare[a.id];const appRoas=row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;return appRoas!=null?appRoas.toFixed(2)+'x':'—';}},
+  {key:'arpu',label:'유저당',get:a=>adArpu(compare[a.id]?.admob?.revenue,compare[a.id]?.ga4?.activeUsers),render:a=>fmtUsd(adArpu(compare[a.id]?.admob?.revenue,compare[a.id]?.ga4?.activeUsers))},
+  {key:'ecpm',label:'eCPM',get:a=>compare[a.id]?.admob?.ecpm??null,render:a=>{const row=compare[a.id];return row?.admob?'$'+row.admob.ecpm.toFixed(2):'—';}},
+ ],[compare,playSetup]);
  const overviewPlayErrors=apps.map(a=>{
   const row=compare[a.id];
   if(!a.androidPkg||!row?.playError)return '';
@@ -227,7 +239,7 @@ export default function Dashboard({page}:{page:string}){
   </div>;
  })()}
  {page==='overview'&&appsLoaded&&!apps.length&&!appsError&&<div className="empty"><h2>등록된 앱이 없습니다</h2><p>Connections에서 앱을 추가하세요.</p><p className="note"><Link href="/connections">데이터 연결로 이동</Link></p></div>}
- {page==='overview'&&!!apps.length&&<div className="tablewrap comparewrap"><table className="dense"><thead><tr><th>앱</th><th>DAU</th><th>Play</th><th>ASC</th><th>수익</th><th>비용</th><th>ROAS</th><th>유저당</th><th>eCPM</th></tr></thead><tbody>{apps.map(a=>{const row=compare[a.id];const ascPending=!!a.appleAppId&&!!row?.store&&row.store.ascDownloads==null;const arpu=adArpu(row?.admob?.revenue,row?.ga4?.activeUsers);const appRoas=row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;return <tr key={a.id} style={{cursor:'pointer'}} onClick={()=>router.push(`/apps/${a.id}`)} title={row?.ga4?`세션 ${row.ga4.sessions.toLocaleString()} · 활성 ${row.ga4.activeUsers.toLocaleString()}${row?.admob?` · CTR ${(row.admob.ctr*100).toFixed(2)}%`:''}`:undefined}><td><div className="applink"><AppIcon app={a}/><span><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}<small>{a.androidPkg||a.id}{row?.store?.playSource?` · ${row.store.playSource}`:''}{row?.ga4Error?' · GA4 오류':''}</small></span></div></td><td>{row?.ga4?row.ga4.averageDau.toLocaleString():'—'}</td><td>{playCell(a,row)}</td><td>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():ascPending?<span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">배치 대기</Link></span>:(a.appleAppId?'—':'iOS 미출시')}</td><td>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</td><td>{row?.spend!=null?'$'+row.spend.toFixed(2):'—'}</td><td>{appRoas!=null?appRoas.toFixed(2)+'x':'—'}</td><td>{fmtUsd(arpu)}</td><td>{row?.admob?'$'+row.admob.ecpm.toFixed(2):'—'}</td></tr>;})}</tbody></table></div>}
+ {page==='overview'&&!!apps.length&&<MetricTable rows={apps} columns={compareCols} rowKey={a=>a.id} wrapClassName="tablewrap comparewrap" defaultSort={{key:'dau',dir:'desc'}} onRowClick={a=>router.push(`/apps/${a.id}`)} rowTitle={a=>{const row=compare[a.id];return row?.ga4?`세션 ${row.ga4.sessions.toLocaleString()} · 활성 ${row.ga4.activeUsers.toLocaleString()}${row?.admob?` · CTR ${(row.admob.ctr*100).toFixed(2)}%`:''}`:undefined;}}/>}
 
  {page==='overview'&&!!apps.length&&<OverviewCombined apps={apps} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}
  {!!current&&<OverviewCombined apps={[current]} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}

@@ -3,6 +3,7 @@ import {seal} from '@/lib/admob-crypto.mjs';
 import type {AppRecord} from '@/lib/apps';
 import {LabelText} from './field-help';
 import {HELP} from '@/lib/connection-help';
+import MetricTable from './metric-table';
 
 type Account={id:string;platform:string;label:string;appId:string;externalId:string;lastSyncAt:string|null;lastError:string|null};
 type Setup={accounts:Account[];publicKey:JsonWebKey;kid:string};
@@ -209,21 +210,23 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
     <button type="button" className="refresh" disabled={busy} onClick={()=>void refreshDays()}>새로고침</button>
    </div>
    {!days.length&&<p className="note">이 기간에 저장된 비용이 없습니다.</p>}
-   {!!days.length&&<div className="tablewrap"><table className="dense marketing-days-table"><thead><tr><th>날짜</th><th>앱</th><th>채널</th><th>비용</th><th className="cell-text">작업</th></tr></thead>
-    <tbody>{days.map(row=>{
-     const key=`${row.appId}|${row.source}|${row.date}`;
-     return <tr key={key} className={editingKey===key?'on':undefined}>
-      <td>{row.date}</td>
-      <td className="cell-text">{appName(row.appId)}</td>
-      <td>{SOURCE_LABEL[row.source]||row.source}</td>
-      <td>${row.spend.toFixed(2)}</td>
-      <td className="cell-text"><div className="marketing-day-actions">
-       <button type="button" className="refresh" disabled={busy} onClick={()=>beginEdit(row)}>수정</button>
-       <button type="button" className="refresh" disabled={busy} onClick={()=>void removeDay(row)}>삭제</button>
-      </div></td>
-     </tr>;
-    })}</tbody>
-   </table></div>}
+   {!!days.length&&<MetricTable
+    rows={days}
+    rowKey={row=>`${row.appId}|${row.source}|${row.date}`}
+    tableClassName="dense marketing-days-table"
+    defaultSort={{key:'date',dir:'desc'}}
+    rowClassName={row=>editingKey===`${row.appId}|${row.source}|${row.date}`?'on':undefined}
+    columns={[
+     {key:'date',label:'날짜',get:r=>r.date,render:r=>r.date},
+     {key:'app',label:'앱',className:'cell-text',get:r=>appName(r.appId),render:r=>appName(r.appId)},
+     {key:'source',label:'채널',get:r=>SOURCE_LABEL[r.source]||r.source,render:r=>SOURCE_LABEL[r.source]||r.source},
+     {key:'spend',label:'비용',get:r=>r.spend,render:r=>`$${r.spend.toFixed(2)}`},
+     {key:'actions',label:'작업',className:'cell-text',sortable:false,get:()=>null,render:r=><div className="marketing-day-actions">
+      <button type="button" className="refresh" disabled={busy} onClick={()=>beginEdit(r)}>수정</button>
+      <button type="button" className="refresh" disabled={busy} onClick={()=>void removeDay(r)}>삭제</button>
+     </div>},
+    ]}
+   />}
   </div>
 
   <details className="marketing-more">

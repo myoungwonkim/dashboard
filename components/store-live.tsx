@@ -4,6 +4,7 @@ import {appColor} from '@/lib/app-colors';
 import {meanNums,sumNums} from '@/lib/metric-rollups.mts';
 import TrendChart from './trend-chart';
 import {recentAppVersions} from '@/lib/app-version.mts';
+import MetricTable from './metric-table';
 function AppMark({id,name}:{id:string;name:string}){
  return <span className="apptitle"><span className="appdot" style={{background:appColor(id)}} aria-hidden/>{name}</span>;
 }
@@ -17,7 +18,15 @@ function SpikeNote({spike}:{spike?:Spike|null}){if(!spike)return null;return <p 
 function DimTable({title,rows,metric,recentVersions=false}:{title:string;rows?:Dim[];metric:'installs'|'visitors';recentVersions?:boolean}){
  if(!rows?.length)return null;
  const list=recentVersions?recentAppVersions(rows,r=>r.key):rows.slice(0,12);
- return <div className="panel"><div className="sectiontitle"><h2>{title}</h2><span>{recentVersions?'최근 · 5행':'Top'}</span></div><div className={'tablewrap'+(recentVersions?' version-scroll':'')}><table className="dense"><thead><tr><th>항목</th><th>{metric==='installs'?'설치':'방문'}</th><th>전환</th><th>평점</th></tr></thead><tbody>{list.map(r=><tr key={r.key}><td className="cell-text">{r.key}</td><td>{(metric==='installs'?r.installs:r.visitors).toLocaleString()}</td><td>{r.conversions?r.conversions.toLocaleString():'—'}</td><td>{r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'}</td></tr>)}</tbody></table></div></div>;
+ const metricKey=metric==='installs'?'installs':'visitors';
+ return <div className="panel"><div className="sectiontitle"><h2>{title}</h2><span>{recentVersions?'최근 · 5행':'Top'}</span></div>
+  <MetricTable rows={list} rowKey={r=>r.key} wrapClassName={'tablewrap'+(recentVersions?' version-scroll':'')} defaultSort={recentVersions?null:{key:metricKey,dir:'desc'}} columns={[
+   {key:'key',label:'항목',className:'cell-text',get:r=>r.key,render:r=>r.key},
+   {key:metricKey,label:metric==='installs'?'설치':'방문',get:r=>metric==='installs'?r.installs:r.visitors,render:r=>(metric==='installs'?r.installs:r.visitors).toLocaleString()},
+   {key:'conversions',label:'전환',get:r=>r.conversions||null,render:r=>r.conversions?r.conversions.toLocaleString():'—'},
+   {key:'rating',label:'평점',get:r=>r.ratingAvg,render:r=>r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'},
+  ]}/>
+ </div>;
 }
 export default function StoreLive({apps,app,days,startDate,endDate,showCharts=true}:{apps:AppRecord[];app?:string;days:number;startDate?:string;endDate?:string;showCharts?:boolean}){
  const [play,setPlay]=useState<Record<string,Result<PlayData>>>({});
