@@ -1,5 +1,5 @@
 import {getCurrentUser} from '@/worker/identity';
-import {parseMarketingCsv,upsertMarketingDays,isMarketingSource,type MarketingDay} from '@/lib/marketing-core.mts';
+import {parseMarketingCsv,upsertMarketingDays,deleteMarketingDays,isMarketingSource,type MarketingDay,type MarketingDayKey} from '@/lib/marketing-core.mts';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie','X-Content-Type-Options':'nosniff'}});
 
@@ -7,7 +7,13 @@ export async function POST(req:Request){
  const user=await getCurrentUser();if(!user)return json({message:'로그인이 필요합니다.'},403);
  if(req.headers.get('origin')!==new URL(req.url).origin)return json({message:'잘못된 요청입니다.'},403);
  try{
-  const body=await req.json() as {csv?:string;rows?:MarketingDay[];row?:Partial<MarketingDay>};
+  const body=await req.json() as {action?:string;csv?:string;rows?:MarketingDay[];row?:Partial<MarketingDay>;keys?:MarketingDayKey[];key?:MarketingDayKey};
+  if(body.action==='delete'){
+   const keys=Array.isArray(body.keys)?body.keys:(body.key?[body.key]:[]);
+   if(!keys.length)return json({message:'삭제할 항목이 없습니다.'},400);
+   const n=await deleteMarketingDays(keys);
+   return json({ok:true,deleted:n,message:n?`${n}건 삭제했습니다.`:'삭제할 행이 없습니다.'});
+  }
   let rows:MarketingDay[]=[];
   const errors:string[]=[];
   if(typeof body.csv==='string'){

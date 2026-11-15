@@ -21,6 +21,24 @@ export async function upsertMarketingDays(rows:MarketingDay[]){
  return n;
 }
 
+export type MarketingDayKey={appId:string;source:string;date:string};
+
+export async function deleteMarketingDays(keys:MarketingDayKey[]){
+ if(!keys.length)return 0;
+ const db=getDb();
+ let n=0;
+ for(const key of keys){
+  if(!key.appId||!key.source||!/^\d{4}-\d{2}-\d{2}$/.test(key.date))continue;
+  const removed=await db.delete(marketingDaily).where(and(
+   eq(marketingDaily.appId,key.appId),
+   eq(marketingDaily.source,key.source),
+   eq(marketingDaily.date,key.date),
+  )).returning({appId:marketingDaily.appId});
+  n+=removed.length;
+ }
+ return n;
+}
+
 export async function loadMarketingRange(opts:{appId?:string;startDate:string;endDate:string}){
  const db=getDb();
  const conds=[gte(marketingDaily.date,opts.startDate),lte(marketingDaily.date,opts.endDate)];

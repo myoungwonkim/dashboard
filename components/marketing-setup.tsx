@@ -6,8 +6,15 @@ import {HELP} from '@/lib/connection-help';
 
 type Account={id:string;platform:string;label:string;appId:string;externalId:string;lastSyncAt:string|null;lastError:string|null};
 type Setup={accounts:Account[];publicKey:JsonWebKey;kid:string};
+type DayRow={appId:string;source:string;date:string;spend:number;currency:string;note?:string|null};
 
-const CHANNELS=[{id:'google_ads',label:'Google Ads'},{id:'meta',label:'Meta'},{id:'other',label:'기타'}] as const;
+const CHANNELS=[{id:'google_ads',label:'Google Ads'},{id:'meta',label:'Meta'},{id:'manual',label:'수동'},{id:'other',label:'기타'}] as const;
+const SOURCE_LABEL:Record<string,string>={google_ads:'Google Ads',meta:'Meta',manual:'수동',other:'기타'};
+
+function isoDaysAgo(n:number){const d=new Date();d.setUTCDate(d.getUTCDate()-n);return d.toISOString().slice(0,10);}
+function todayIso(){return new Date().toISOString().slice(0,10);}
+
+const CSV_TEMPLATE_HEADER='date,app_id,source,spend,currency,note';
 
 export default function MarketingSetup({apps}:{apps:AppRecord[]}){
  const [setup,setSetup]=useState<Setup|null>(null);
@@ -15,10 +22,16 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
  const [message,setMessage]=useState('마케팅 비용 확인 중…');
  // Manual (primary)
  const [appId,setAppId]=useState(apps[0]?.id||'');
- const [date,setDate]=useState(()=>new Date().toISOString().slice(0,10));
+ const [date,setDate]=useState(todayIso);
  const [channel,setChannel]=useState('google_ads');
  const [spend,setSpend]=useState('');
  const [csv,setCsv]=useState('');
+ const [editingKey,setEditingKey]=useState<string|null>(null);
+ // Saved rows
+ const [listStart,setListStart]=useState(()=>isoDaysAgo(30));
+ const [listEnd,setListEnd]=useState(todayIso);
+ const [listApp,setListApp]=useState('');
+ const [days,setDays]=useState<DayRow[]>([]);
  // Advanced API (collapsed)
  const [platform,setPlatform]=useState<'google_ads'|'meta'>('meta');
  const [apiApp,setApiApp]=useState(apps[0]?.id||'');
@@ -29,14 +42,16 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
  const [refreshToken,setRefreshToken]=useState('');
  const [developerToken,setDeveloperToken]=useState('');
  const [customerId,setCustomerId]=useState('');
- const [syncStart,setSyncStart]=useState(()=>{const d=new Date();d.setUTCDate(d.getUTCDate()-7);return d.toISOString().slice(0,10);});
- const [syncEnd,setSyncEnd]=useState(()=>new Date().toISOString().slice(0,10));
+ const [syncStart,setSyncStart]=useState(()=>isoDaysAgo(7));
+ const [syncEnd,setSyncEnd]=useState(todayIso);
+
+ const appName=(id:string)=>apps.find(a=>a.id===id)?.name||id;
 
  useEffect(()=>{
   if(apps[0]){if(!appId)setAppId(apps[0].id);if(!apiApp)setApiApp(apps[0].id);}
  },[apps,appId,apiApp]);
 
- async function refresh(){
+ async function refreshSetup(){
   try{
    const r=await fetch('/api/marketing/setup',{cache:'no-store'});
    const v=await r.json() as Setup & {message?:string};
@@ -45,7 +60,19 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
    setMessage(v.accounts.length?`API 계정 ${v.accounts.length}개 · 수동 입력도 가능`:'앱·날짜·비용만 넣으면 됩니다. CSV도 지원합니다.');
   }catch(e){setMessage(e instanceof Error?e.message:'상태를 불러오지 못했습니다.');}
  }
- useEffect(()=>{void refresh();},[]);
+
+ async function refreshDays(){
+  try{
+   const r=await fetch('/api/marketing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:listApp||undefined,startDate:listStart,endDate:listEnd})});
+   const v=await r.json() as {status?:string;message?:string;data?:{rows?:DayRow[]}};
+   if(!r.ok||v.status!=='success')throw Error(v.message||'목록을 불러오지 못했습니다.');
+   const rows=[...(v.data?.rows||[])].sort((a,b)=>b.date.localeCompare(a.date)||a.appId.localeCompare(b.appId)||a.source.localeCompare(b.source));
+   setDays(rows);
+  }catch(e){setMessage(e instanceof Error?e.message:'목록을 불러오지 못했습니다.');}
+ }
+
+ useEffect(()=>{void refreshSetup();},[]);
+ useEffect(()=>{void refreshDays();},[listStart,listEnd,listApp]);
 
  async function saveDay(){
   if(busy)return;setBusy(true);
@@ -54,7 +81,9 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
    if(!(amount>=0)||!appId||!date)throw Error('앱·날짜·금액을 확인하세요.');
    const r=await fetch('/api/marketing/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({row:{date,appId,source:channel,spend:amount,currency:'USD'}})});
    const v=await r.json() as {message?:string};if(!r.ok)throw Error(v.message);
-   setMessage(v.message||'저장했습니다.');setSpend('');
+   setMessage(editingKey?'수정했습니다.':(v.message||'저장했습니다.'));
+   setSpend('');setEditingKey(null);
+   await refreshDays();
   }catch(e){setMessage(e instanceof Error?e.message:'저장 실패');}
   finally{setBusy(false);}
  }
@@ -65,6 +94,7 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
    const r=await fetch('/api/marketing/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csv})});
    const v=await r.json() as {message?:string;errors?:string[]};if(!r.ok)throw Error(v.message||v.errors?.[0]||'업로드 실패');
    setMessage(v.message||'CSV 저장 완료');if(!v.errors?.length)setCsv('');
+   await refreshDays();
   }catch(e){setMessage(e instanceof Error?e.message:'CSV 업로드 실패');}
   finally{setBusy(false);}
  }
@@ -80,7 +110,7 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
    const v=await r.json() as {message?:string};if(!r.ok)throw Error(v.message||'저장 실패');
    setMessage(v.message||'API 계정을 저장했습니다.');
    setAccessToken('');setClientSecret('');setRefreshToken('');
-   await refresh();
+   await refreshSetup();
   }catch(e){setMessage(e instanceof Error?e.message:'API 계정 저장 실패');}
   finally{setBusy(false);}
  }
@@ -90,7 +120,7 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
   try{
    const r=await fetch('/api/marketing/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({startDate:syncStart,endDate:syncEnd})});
    const v=await r.json() as {message?:string};if(!r.ok)throw Error(v.message);
-   setMessage(v.message||'동기화 완료');await refresh();
+   setMessage(v.message||'동기화 완료');await refreshSetup();await refreshDays();
   }catch(e){setMessage(e instanceof Error?e.message:'동기화 실패');}
   finally{setBusy(false);}
  }
@@ -101,29 +131,108 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
   try{
    const r=await fetch('/api/marketing/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',id})});
    const v=await r.json() as {message?:string};if(!r.ok)throw Error(v.message);
-   setMessage(v.message||'삭제했습니다.');await refresh();
+   setMessage(v.message||'삭제했습니다.');await refreshSetup();
   }catch(e){setMessage(e instanceof Error?e.message:'삭제 실패');}
   finally{setBusy(false);}
  }
 
- const appName=(id:string)=>apps.find(a=>a.id===id)?.name||id;
+ function beginEdit(row:DayRow){
+  setAppId(row.appId);
+  setDate(row.date);
+  setChannel(CHANNELS.some(c=>c.id===row.source)?row.source:'other');
+  setSpend(String(row.spend));
+  setEditingKey(`${row.appId}|${row.source}|${row.date}`);
+  setMessage('위 입력칸에서 금액을 고친 뒤 저장하세요. 같은 앱·채널·날짜면 덮어씁니다.');
+  document.getElementById('marketing-day-form')?.scrollIntoView({behavior:'smooth',block:'start'});
+ }
+
+ function cancelEdit(){
+  setEditingKey(null);setSpend('');setMessage('수정을 취소했습니다.');
+ }
+
+ async function removeDay(row:DayRow){
+  const label=`${row.date} · ${appName(row.appId)} · ${SOURCE_LABEL[row.source]||row.source} · $${row.spend.toFixed(2)}`;
+  if(busy||!confirm(`이 비용을 삭제할까요?\n${label}`))return;
+  setBusy(true);
+  try{
+   const r=await fetch('/api/marketing/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',key:{appId:row.appId,source:row.source,date:row.date}})});
+   const v=await r.json() as {message?:string};if(!r.ok)throw Error(v.message);
+   setMessage(v.message||'삭제했습니다.');
+   if(editingKey===`${row.appId}|${row.source}|${row.date}`)cancelEdit();
+   await refreshDays();
+  }catch(e){setMessage(e instanceof Error?e.message:'삭제 실패');}
+  finally{setBusy(false);}
+ }
+
+ function downloadCsvTemplate(){
+  const sampleApp=apps[0]?.id||'bazi';
+  const d1=isoDaysAgo(2),d2=isoDaysAgo(1);
+  const body=[
+   CSV_TEMPLATE_HEADER,
+   `${d1},${sampleApp},google_ads,12.50,USD,예시`,
+   `${d2},${sampleApp},meta,8.00,USD,`,
+   `${todayIso()},${sampleApp},other,0,USD,`,
+  ].join('\n');
+  const blob=new Blob([body+'\n'],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='marketing-spend-template.csv';a.click();
+  URL.revokeObjectURL(url);
+ }
 
  return <section className="safenote ga4setup" id="marketing">
-  <div className="sectiontitle"><h2>마케팅 비용</h2><span className="status">간단 입력</span></div>
-  <p role="status" aria-live="polite">{message}</p>
+  <div className="sectiontitle"><h2>마케팅 비용</h2><span className="status">{editingKey?'수정 중':'간단 입력'}</span></div>
+  <p role="status" aria-live="polite">{message||(setup?.accounts.length?`API 계정 ${setup.accounts.length}개 · 수동 입력도 가능`:'앱·날짜·비용만 넣으면 됩니다. CSV도 지원합니다.')}</p>
 
-  <div className="form marketing-simple">
+  <div className="form marketing-simple" id="marketing-day-form">
    <label>앱<select value={appId} onChange={e=>setAppId(e.target.value)}>{apps.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
    <label>날짜<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
    <label>채널<select value={channel} onChange={e=>setChannel(e.target.value)}>{CHANNELS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
    <label>비용 (USD)<input inputMode="decimal" value={spend} onChange={e=>setSpend(e.target.value)} placeholder="12.50"/></label>
-   <button type="button" className="setupbutton" disabled={busy||!apps.length} onClick={()=>void saveDay()}>저장</button>
+   <div className="setupactions" style={{margin:0}}>
+    <button type="button" className="setupbutton" disabled={busy||!apps.length} onClick={()=>void saveDay()}>{editingKey?'수정 저장':'저장'}</button>
+    {editingKey&&<button type="button" className="refresh" disabled={busy} onClick={cancelEdit}>수정 취소</button>}
+   </div>
+  </div>
+
+  <div className="marketing-days">
+   <div className="sectiontitle"><h2>저장된 비용</h2><span>{days.length}건</span></div>
+   <div className="setupactions marketing-days-filters">
+    <label className="filelabel">시작<input type="date" value={listStart} onChange={e=>setListStart(e.target.value)}/></label>
+    <label className="filelabel">종료<input type="date" value={listEnd} onChange={e=>setListEnd(e.target.value)}/></label>
+    <label className="filelabel">앱
+     <select value={listApp} onChange={e=>setListApp(e.target.value)}>
+      <option value="">전체</option>
+      {apps.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+     </select>
+    </label>
+    <button type="button" className="refresh" disabled={busy} onClick={()=>void refreshDays()}>새로고침</button>
+   </div>
+   {!days.length&&<p className="note">이 기간에 저장된 비용이 없습니다.</p>}
+   {!!days.length&&<div className="tablewrap"><table className="dense marketing-days-table"><thead><tr><th>날짜</th><th>앱</th><th>채널</th><th>비용</th><th className="cell-text">작업</th></tr></thead>
+    <tbody>{days.map(row=>{
+     const key=`${row.appId}|${row.source}|${row.date}`;
+     return <tr key={key} className={editingKey===key?'on':undefined}>
+      <td>{row.date}</td>
+      <td className="cell-text">{appName(row.appId)}</td>
+      <td>{SOURCE_LABEL[row.source]||row.source}</td>
+      <td>${row.spend.toFixed(2)}</td>
+      <td className="cell-text"><div className="marketing-day-actions">
+       <button type="button" className="refresh" disabled={busy} onClick={()=>beginEdit(row)}>수정</button>
+       <button type="button" className="refresh" disabled={busy} onClick={()=>void removeDay(row)}>삭제</button>
+      </div></td>
+     </tr>;
+    })}</tbody>
+   </table></div>}
   </div>
 
   <details className="marketing-more">
    <summary>여러 날을 CSV로 한 번에 올리기</summary>
-   <p className="note">한 줄에 하루 · 헤더 예: <code>date,app_id,source,spend</code> · source는 google_ads / meta / other</p>
-   <textarea className="marketing-csv" value={csv} onChange={e=>setCsv(e.target.value)} rows={5} placeholder={'date,app_id,source,spend\n2024-01-01,bazi,google_ads,15'}/>
+   <p className="note">한 줄에 하루 · source는 google_ads / meta / manual / other · 같은 앱·채널·날짜는 덮어씁니다.</p>
+   <div className="setupactions">
+    <button type="button" className="refresh" onClick={downloadCsvTemplate}>CSV 양식 다운로드</button>
+   </div>
+   <textarea className="marketing-csv" value={csv} onChange={e=>setCsv(e.target.value)} rows={5} placeholder={`${CSV_TEMPLATE_HEADER}\n2024-01-01,bazi,google_ads,15,USD,`}/>
    <div className="setupactions"><button type="button" className="setupbutton" disabled={busy||!csv.trim()} onClick={()=>void saveCsv()}>CSV 저장</button></div>
   </details>
 

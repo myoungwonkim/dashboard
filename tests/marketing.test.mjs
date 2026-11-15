@@ -26,6 +26,15 @@ test('roas and source helpers',()=>{
  assert.equal(isMarketingSource('tiktok'),false);
 });
 
+test('CSV template header matches parser expectations',()=>{
+ const sample='date,app_id,source,spend,currency,note\n2024-01-01,bazi,google_ads,12.50,USD,예시\n2024-01-02,bazi,meta,8,USD,';
+ const {rows,errors}=parseMarketingCsv(sample);
+ assert.equal(errors.length,0);
+ assert.equal(rows.length,2);
+ assert.equal(rows[0].currency,'USD');
+ assert.equal(rows[0].note,'예시');
+});
+
 test('google ads credential validation',()=>{
  assert.equal(normalizeCustomerId('123-456-7890'),'1234567890');
  const c=validateGoogleAdsCreds({client_id:'a',client_secret:'b',refresh_token:'c',developer_token:'d',customer_id:'123-456-7890'});
