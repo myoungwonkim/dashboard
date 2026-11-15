@@ -121,13 +121,20 @@ export default function OverviewCombined({apps,days,startDate,endDate,country,os
  },[playParts,ascParts]);
 
  const periodEcpi=cpi(periodSpend,periodNewUsers);
+ const multi=apps.length>1;
+ const scopeLabel=multi?'합산':'이 앱';
+ const revenueSeriesNamed=useMemo(()=>revenueSeries.map(s=>({...s,name:multi?'광고 수익 합':'광고 수익'})),[revenueSeries,multi]);
+ const storeSeriesNamed=useMemo(()=>storeSeries.map(s=>({
+  ...s,
+  name:s.name.includes('Play')?(multi?'Play 설치 합':'Play 설치'):(multi?'ASC 다운로드 합':'ASC 다운로드'),
+ })),[storeSeries,multi]);
 
  return <section className="overview-combined">
-  <div className="sectiontitle"><h2>합산 추세</h2><span>{loading?'조회 중…':'앱 합 · 시리즈 온/오프'}</span></div>
-  <p className="note">앱별 수치를 날짜별로 합칩니다. eCPI = 마케팅 비용 ÷ 신규 사용자(GA4) · 기간 eCPI {periodEcpi==null?'—':'$'+periodEcpi.toFixed(2)} · 블록을 눌러 그래프를 켜고 끌 수 있습니다.</p>
-  {!!hero.length&&!loading&&<div className="panel"><div className="sectiontitle"><h2>일별 활성 · 신규 · 비용 · eCPI</h2><span>합산</span></div><TrendChart series={hero} height={220}/></div>}
-  {!!revenueSeries.length&&!loading&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>일별 광고 수익</h2><span>합산</span></div><TrendChart series={revenueSeries}/></div>}
-  {!!storeSeries.length&&!loading&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>합산</span></div><TrendChart series={storeSeries}/></div>}
-  {!loading&&!hero.length&&!revenueSeries.length&&!storeSeries.length&&<p className="note">표시할 일별 데이터가 없습니다. 연결 상태를 확인해 주세요.</p>}
+  <div className="sectiontitle"><h2>{multi?'합산 추세':'핵심 추세'}</h2><span>{loading?'조회 중…':(multi?'앱 합 · 시리즈 온/오프':'시리즈 온/오프')}</span></div>
+  <p className="note">{multi?'앱별 수치를 날짜별로 합칩니다. ':''}eCPI = 마케팅 비용 ÷ 신규 사용자(GA4) · 기간 eCPI {periodEcpi==null?'—':'$'+periodEcpi.toFixed(2)} · 블록을 눌러 그래프를 켜고 끌 수 있습니다.</p>
+  {!!hero.length&&!loading&&<div className="panel"><div className="sectiontitle"><h2>일별 활성 · 신규 · 비용 · eCPI</h2><span>{scopeLabel}</span></div><TrendChart series={hero} height={220}/></div>}
+  {!!revenueSeriesNamed.length&&!loading&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>일별 광고 수익</h2><span>{scopeLabel}</span></div><TrendChart series={revenueSeriesNamed}/></div>}
+  {!!storeSeriesNamed.length&&!loading&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>{scopeLabel}</span></div><TrendChart series={storeSeriesNamed}/></div>}
+  {!loading&&!hero.length&&!revenueSeriesNamed.length&&!storeSeriesNamed.length&&<p className="note">표시할 일별 데이터가 없습니다. 연결 상태를 확인해 주세요.</p>}
  </section>;
 }

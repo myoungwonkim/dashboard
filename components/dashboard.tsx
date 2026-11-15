@@ -96,10 +96,11 @@ export default function Dashboard({page}:{page:string}){
  },[apps,compare]);
 
  useEffect(()=>{
-  if(page!=='overview'||!apps.length)return;
+  const scope=page==='overview'?apps:(current?[current]:[]);
+  if(!scope.length)return;
   const controller=new AbortController();
   setCompare({});
-  Promise.all(apps.map(async a=>{
+  Promise.all(scope.map(async a=>{
    const next:CompareRow={store:{}};
    if(a.ga4PropertyId){
     try{const res=await fetch('/api/ga4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate,country,os}),signal:controller.signal});const body=await res.json() as {status:string;data?:Ga4Row;message?:string};if(res.ok&&body.status==='success'&&body.data)next.ga4=body.data;else next.ga4Error=body.message||'GA4 조회 실패';}catch{next.ga4Error='GA4 서버 연결 실패';}
@@ -129,7 +130,7 @@ export default function Dashboard({page}:{page:string}){
    if(!controller.signal.aborted)setCompare(prev=>({...prev,[a.id]:next}));
   }));
   return ()=>controller.abort();
- },[page,apps,days,dateRange.startDate,dateRange.endDate,country,os]);
+ },[page,current?.id,apps,days,dateRange.startDate,dateRange.endDate,country,os]);
 
  if(page!=='overview'&&page!=='progress'&&page!=='connections'&&appsLoaded&&!current){
   return <div className="shell"><div className="workspace"><main><h1>앱을 찾을 수 없습니다</h1><p className="subtitle">등록되지 않았거나 보관된 앱입니다.</p><p className="note"><Link href="/connections">데이터 연결에서 앱 확인</Link></p></main></div></div>;
@@ -180,7 +181,7 @@ export default function Dashboard({page}:{page:string}){
 
  return <div className="shell">
  <button type="button" className="float-refresh" disabled={refreshing} onClick={refreshPage} aria-label="데이터 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button>
- <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'왼쪽에서 항목을 고르고, 입력칸 옆 ?로 최신 콘솔 경로를 확인하세요.'}</p></div></div>
+ <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?'KPI · 추세 · 서비스 섹션 순서는 현황과 같습니다.':page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'왼쪽에서 항목을 고르고, 입력칸 옆 ?로 최신 콘솔 경로를 확인하세요.'}</p></div></div>
  {appsError&&<div className="notice" role="status"><span className="dot"/>{appsError}<button type="button" className="refresh" onClick={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}>다시 시도</button></div>}
  {report&&<><div className="noticefold">
   <button type="button" className="noticefold-toggle" aria-expanded={showNotices} onClick={()=>setShowNotices(v=>!v)}>
@@ -210,16 +211,33 @@ export default function Dashboard({page}:{page:string}){
   </div>
   <div className="sectiontitle"><h2>앱 비교</h2><span>같은 필터 · 행 클릭 시 상세</span></div>
  </>}
+ {!!current&&(()=>{
+  const row=compare[current.id];
+  const arpu=adArpu(row?.admob?.revenue,row?.ga4?.activeUsers);
+  const appRoas=row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;
+  return <div className="metrics overviewkpi" aria-label="앱 핵심 지표">
+   <div className="metric"><span>평균 DAU</span><strong>{row?.ga4?Math.round(row.ga4.averageDau).toLocaleString():'—'}</strong><small>GA4</small></div>
+   <div className="metric"><span>Play 설치</span><strong>{row?.store?.playInstalls!=null?row.store.playInstalls.toLocaleString():'—'}</strong><small>{playSetup?.gcsBucket?'GCS/배치':(current.androidPkg?'버킷 미등록':'Android 미등록')}</small></div>
+   <div className="metric"><span>ASC 다운로드</span><strong>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():'—'}</strong><small>{current.appleAppId?'App Store':'iOS 미출시'}</small></div>
+   <div className="metric"><span>광고 수익</span><strong>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</strong><small>AdMob</small></div>
+   <div className="metric"><span>마케팅 비용</span><strong>{row?.spend!=null?'$'+row.spend.toFixed(2):'—'}</strong><small>Ads · 수동</small></div>
+   <div className="metric"><span>ROAS</span><strong>{appRoas!=null?appRoas.toFixed(2)+'x':'—'}</strong><small>AdMob÷마케팅 비용</small></div>
+   <div className="metric"><span>유저당 광고 수익</span><strong>{fmtUsd(arpu)}</strong><small>AdMob÷GA4 활성</small></div>
+   <div className="metric"><span>eCPM</span><strong>{row?.admob?'$'+row.admob.ecpm.toFixed(2):'—'}</strong><small>AdMob</small></div>
+   <div className="metric"><span>신규 사용자</span><strong>{row?.ga4?.newUsers!=null?row.ga4.newUsers.toLocaleString():'—'}</strong><small>GA4</small></div>
+  </div>;
+ })()}
  {page==='overview'&&appsLoaded&&!apps.length&&!appsError&&<div className="empty"><h2>등록된 앱이 없습니다</h2><p>Connections에서 앱을 추가하세요.</p><p className="note"><Link href="/connections">데이터 연결로 이동</Link></p></div>}
  {page==='overview'&&!!apps.length&&<div className="tablewrap comparewrap"><table className="dense"><thead><tr><th>앱</th><th>DAU</th><th>Play</th><th>ASC</th><th>수익</th><th>비용</th><th>ROAS</th><th>유저당</th><th>eCPM</th></tr></thead><tbody>{apps.map(a=>{const row=compare[a.id];const ascPending=!!a.appleAppId&&!!row?.store&&row.store.ascDownloads==null;const arpu=adArpu(row?.admob?.revenue,row?.ga4?.activeUsers);const appRoas=row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;return <tr key={a.id} style={{cursor:'pointer'}} onClick={()=>router.push(`/apps/${a.id}`)} title={row?.ga4?`세션 ${row.ga4.sessions.toLocaleString()} · 활성 ${row.ga4.activeUsers.toLocaleString()}${row?.admob?` · CTR ${(row.admob.ctr*100).toFixed(2)}%`:''}`:undefined}><td><div className="applink"><AppIcon app={a}/><span><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}<small>{a.androidPkg||a.id}{row?.store?.playSource?` · ${row.store.playSource}`:''}{row?.ga4Error?' · GA4 오류':''}</small></span></div></td><td>{row?.ga4?row.ga4.averageDau.toLocaleString():'—'}</td><td>{playCell(a,row)}</td><td>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():ascPending?<span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">배치 대기</Link></span>:(a.appleAppId?'—':'iOS 미출시')}</td><td>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</td><td>{row?.spend!=null?'$'+row.spend.toFixed(2):'—'}</td><td>{appRoas!=null?appRoas.toFixed(2)+'x':'—'}</td><td>{fmtUsd(arpu)}</td><td>{row?.admob?'$'+row.admob.ecpm.toFixed(2):'—'}</td></tr>;})}</tbody></table></div>}
 
  {page==='overview'&&!!apps.length&&<OverviewCombined apps={apps} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}
+ {!!current&&<OverviewCombined apps={[current]} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}
 
  {(!!current||page==='overview')&&<>
-  <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={page!=='overview'}/>
-  <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={page!=='overview'}/>
-  <MarketingLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} revenueByApp={revenueByApp} newUsersByApp={newUsersByApp} showCharts={page!=='overview'}/>
-  <StoreLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} showCharts={page!=='overview'}/>
+  <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={false}/>
+  <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={false}/>
+  <MarketingLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} revenueByApp={revenueByApp} newUsersByApp={newUsersByApp} showCharts={false}/>
+  <StoreLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} showCharts={false}/>
  </>}
  {page==='overview'&&!!apps.length&&<p className="note">앱 행을 클릭하면 해당 앱 상세로 이동합니다.</p>}
  </>}
