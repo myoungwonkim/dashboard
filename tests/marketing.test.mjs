@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseMarketingCsv,roas,isMarketingSource} from '../lib/marketing-format.mts';
+import {parseMarketingCsv,roas,cpi,isMarketingSource} from '../lib/marketing-format.mts';
 import {normalizeCustomerId,validateGoogleAdsCreds} from '../lib/marketing-google.mts';
 import {normalizeAdAccountId,validateMetaAdsCreds} from '../lib/marketing-meta.mts';
 
@@ -24,6 +24,13 @@ test('roas and source helpers',()=>{
  assert.equal(roas(100,0),null);
  assert.equal(isMarketingSource('manual'),true);
  assert.equal(isMarketingSource('tiktok'),false);
+});
+
+test('cpi is spend divided by acquisitions',()=>{
+ assert.equal(cpi(100,50),2);
+ assert.equal(cpi(12.5,10),1.25);
+ assert.equal(cpi(100,0),null);
+ assert.equal(cpi(null,10),null);
 });
 
 test('CSV template header matches parser expectations',()=>{

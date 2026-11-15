@@ -14,7 +14,7 @@ type AscData={appleAppId:string;name:string;bundleId:string;downloads:number|nul
 type Result<T>={status:'success';data:T}|{status:'error';message:string;code?:string};
 function SpikeNote({spike}:{spike?:Spike|null}){if(!spike)return null;return <p className="note">급변 {spike.direction==='up'?'↑':'↓'} {spike.date}: {spike.value.toLocaleString()} (최근 평균 {Math.round(spike.baseline).toLocaleString()}{spike.ratio!=null?` · ×${spike.ratio.toFixed(1)}`:''})</p>;}
 function DimTable({title,rows,metric}:{title:string;rows?:Dim[];metric:'installs'|'visitors'}){if(!rows?.length)return null;return <div className="panel"><div className="sectiontitle"><h2>{title}</h2><span>Top</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>항목</th><th>{metric==='installs'?'설치':'방문'}</th><th>전환</th><th>평점</th></tr></thead><tbody>{rows.slice(0,12).map(r=><tr key={r.key}><td className="cell-text">{r.key}</td><td>{(metric==='installs'?r.installs:r.visitors).toLocaleString()}</td><td>{r.conversions?r.conversions.toLocaleString():'—'}</td><td>{r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'}</td></tr>)}</tbody></table></div></div>;}
-export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRecord[];app?:string;days:number;startDate?:string;endDate?:string}){
+export default function StoreLive({apps,app,days,startDate,endDate,showCharts=true}:{apps:AppRecord[];app?:string;days:number;startDate?:string;endDate?:string;showCharts?:boolean}){
  const [play,setPlay]=useState<Record<string,Result<PlayData>>>({});
  const [asc,setAsc]=useState<Record<string,Result<AscData>>>({});
  const [loading,setLoading]=useState(true);
@@ -85,7 +85,7 @@ export default function StoreLive({apps,app,days,startDate,endDate}:{apps:AppRec
    </>}</article>;})}
    {!playTargets.length&&!ascTargets.length&&<p className="note">스토어 ID(패키지·Apple App ID)가 등록된 앱이 없습니다.</p>}
   </div>
-  {!!([...playCharts,...ascCharts].length)&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>스토어</span></div><TrendChart series={[...playCharts,...ascCharts]}/></div>}
+  {showCharts&&!!([...playCharts,...ascCharts].length)&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>스토어</span></div><TrendChart series={[...playCharts,...ascCharts]}/></div>}
   {detailPlay?.status==='success'&&!loading&&!!(detailPlay.data.countries?.length||detailPlay.data.versions?.length||detailPlay.data.traffic?.length)&&<div className={'detail-grid'+(detailPlay.data.countries?.length&&detailPlay.data.versions?.length&&detailPlay.data.traffic?.length?' cols-3':'')} style={{marginTop:20}}>
    <DimTable title="Play 국가별 설치" rows={detailPlay.data.countries} metric="installs"/>
    <DimTable title="Play 앱 버전" rows={detailPlay.data.versions} metric="installs"/>

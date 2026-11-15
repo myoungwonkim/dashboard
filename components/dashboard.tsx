@@ -12,6 +12,7 @@ import GA4Live from './ga4-live';
 import AdmobLive from './admob-live';
 import StoreLive from './store-live';
 import MarketingLive from './marketing-live';
+import OverviewCombined from './overview-combined';
 import ConnectionsPage from './connections-page';
 import PagePicker from './page-picker';
 import {adArpu,fmtUsd} from '@/lib/arpu.mts';
@@ -86,6 +87,11 @@ export default function Dashboard({page}:{page:string}){
  const revenueByApp=useMemo(()=>{
   const out:Record<string,number|undefined>={};
   for(const a of apps)out[a.id]=compare[a.id]?.admob?.revenue;
+  return out;
+ },[apps,compare]);
+ const newUsersByApp=useMemo(()=>{
+  const out:Record<string,number|undefined>={};
+  for(const a of apps)out[a.id]=compare[a.id]?.ga4?.newUsers;
   return out;
  },[apps,compare]);
 
@@ -207,11 +213,13 @@ export default function Dashboard({page}:{page:string}){
  {page==='overview'&&appsLoaded&&!apps.length&&!appsError&&<div className="empty"><h2>등록된 앱이 없습니다</h2><p>Connections에서 앱을 추가하세요.</p><p className="note"><Link href="/connections">데이터 연결로 이동</Link></p></div>}
  {page==='overview'&&!!apps.length&&<div className="tablewrap comparewrap"><table className="dense"><thead><tr><th>앱</th><th>DAU</th><th>Play</th><th>ASC</th><th>수익</th><th>비용</th><th>ROAS</th><th>유저당</th><th>eCPM</th></tr></thead><tbody>{apps.map(a=>{const row=compare[a.id];const ascPending=!!a.appleAppId&&!!row?.store&&row.store.ascDownloads==null;const arpu=adArpu(row?.admob?.revenue,row?.ga4?.activeUsers);const appRoas=row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;return <tr key={a.id} style={{cursor:'pointer'}} onClick={()=>router.push(`/apps/${a.id}`)} title={row?.ga4?`세션 ${row.ga4.sessions.toLocaleString()} · 활성 ${row.ga4.activeUsers.toLocaleString()}${row?.admob?` · CTR ${(row.admob.ctr*100).toFixed(2)}%`:''}`:undefined}><td><div className="applink"><AppIcon app={a}/><span><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}<small>{a.androidPkg||a.id}{row?.store?.playSource?` · ${row.store.playSource}`:''}{row?.ga4Error?' · GA4 오류':''}</small></span></div></td><td>{row?.ga4?row.ga4.averageDau.toLocaleString():'—'}</td><td>{playCell(a,row)}</td><td>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():ascPending?<span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">배치 대기</Link></span>:(a.appleAppId?'—':'iOS 미출시')}</td><td>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</td><td>{row?.spend!=null?'$'+row.spend.toFixed(2):'—'}</td><td>{appRoas!=null?appRoas.toFixed(2)+'x':'—'}</td><td>{fmtUsd(arpu)}</td><td>{row?.admob?'$'+row.admob.ecpm.toFixed(2):'—'}</td></tr>;})}</tbody></table></div>}
 
+ {page==='overview'&&!!apps.length&&<OverviewCombined apps={apps} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}
+
  {(!!current||page==='overview')&&<>
-  <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>
-  <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>
-  <MarketingLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} revenueByApp={revenueByApp}/>
-  <StoreLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate}/>
+  <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={page!=='overview'}/>
+  <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={page!=='overview'}/>
+  <MarketingLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} revenueByApp={revenueByApp} newUsersByApp={newUsersByApp} showCharts={page!=='overview'}/>
+  <StoreLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} showCharts={page!=='overview'}/>
  </>}
  {page==='overview'&&!!apps.length&&<p className="note">앱 행을 클릭하면 해당 앱 상세로 이동합니다.</p>}
  </>}

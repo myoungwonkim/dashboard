@@ -75,7 +75,15 @@
 .panel{border:1px solid #e8e8e8;border-radius:8px;padding:22px;margin-top:8px}
 .trendchart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .trendchart .legend{display:flex;gap:16px;font-size:11px;color:#777;flex-wrap:wrap}
+.trendchart .legend.muted{color:#999}
 .trendchart .legend i{display:inline-block;width:18px;margin-right:6px;vertical-align:middle;background:#333;height:2px}
+.chart-toggles{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.chart-toggle{display:inline-flex;align-items:center;gap:8px;border:1px solid #e2e2df;background:#fff;color:#777;border-radius:8px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer}
+.chart-toggle i{display:inline-block;width:10px;border-radius:2px;flex-shrink:0}
+.chart-toggle.on{border-color:#cfcfc9;background:#f4f4f2;color:#222;font-weight:600}
+.chart-toggle:hover{border-color:#bbb;color:#333}
+.chart-toggle:focus-visible{outline:2px solid #777;outline-offset:2px}
+.overview-combined{margin:28px 0 8px}
 .trendchart .plot{position:relative;touch-action:none}
 .chart-tip{position:absolute;top:8px;transform:translateX(-50%);z-index:2;min-width:140px;max-width:240px;padding:8px 10px;border:1px solid #e5e5e0;border-radius:8px;background:#fff;box-shadow:0 8px 24px #00000014;font-size:11px;color:#555;pointer-events:none}
 .chart-tip strong{display:block;margin-bottom:6px;color:#222;font-size:12px;font-weight:600}

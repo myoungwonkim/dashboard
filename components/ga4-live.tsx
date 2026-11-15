@@ -30,7 +30,7 @@ const SHOW_OFFSETS=[0,1,3,7,14,30];
 function AppMark({id,name}:{id:string;name:string}){
  return <span className="apptitle"><span className="appdot" style={{background:appColor(id)}} aria-hidden/>{name}</span>;
 }
-export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{apps:AppRecord[],app?:string,days:number,startDate:string,endDate:string,country:string,os:string}){
+export default function GA4Live({apps,app,days,startDate,endDate,country,os,showCharts=true}:{apps:AppRecord[],app?:string,days:number,startDate:string,endDate:string,country:string,os:string,showCharts?:boolean}){
  const [results,setResults]=useState<Record<string,Result>>({}),[loading,setLoading]=useState(true);
  const targets=apps.filter(a=>a.ga4PropertyId&&(!app||a.id===app));
  useEffect(()=>{const controller=new AbortController();let active=true;setLoading(true);setResults({});
@@ -95,7 +95,7 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os}:{ap
   ['리텐션 D7',fmtRate(result.data.retention?.summary.d7)],
  ].map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><small>시간대 {result.data.timeZone} · 조회 {new Date(result.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST{result.data.crashAffectedUsers!=null?` · 크래시 영향 ${result.data.crashAffectedUsers.toLocaleString()}명`:''} · D1/D7=리텐션</small>{result.data.limited&&<p>임계값 또는 샘플링 등이 적용된 보고서입니다.</p>}</>}</article>;})}
  </div>
- {!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 활성 · 신규 사용자</h2><span>GA4 · 앱별</span></div><TrendChart series={[...chartSeries,...newUserSeries]}/></div>}
+ {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 활성 · 신규 사용자</h2><span>GA4 · 앱별</span></div><TrendChart series={[...chartSeries,...newUserSeries]}/></div>}
  {!loading&&targets.map(a=>{
   const r=results[a.id];if(!r||r.status!=='success')return null;
   const ret=r.data.retention;

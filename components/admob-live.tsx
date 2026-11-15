@@ -19,7 +19,7 @@ type Result={status:'success',data:Data}|{status:'error',message:string};
 function AppMark({id,name}:{id:string;name:string}){
  return <span className="apptitle"><span className="appdot" style={{background:appColor(id)}} aria-hidden/>{name}</span>;
 }
-export default function AdmobLive({apps,app,days,startDate,endDate,country,os}:{apps:AppRecord[];app?:string;days:number;startDate:string;endDate:string;country:string;os:string}){
+export default function AdmobLive({apps,app,days,startDate,endDate,country,os,showCharts=true}:{apps:AppRecord[];app?:string;days:number;startDate:string;endDate:string;country:string;os:string;showCharts?:boolean}){
  const [results,setResults]=useState<Record<string,Result>>({}),[users,setUsers]=useState<Record<string,Ga4Users|null>>({}),[loading,setLoading]=useState(true);
  const targets=apps.filter(a=>(a.admobAndroidAppId||a.admobIosAppId)&&(!app||a.id===app));
  useEffect(()=>{const c=new AbortController();let active=true;setLoading(true);setResults({});setUsers({});
@@ -91,7 +91,7 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os}:{
   ['CTR',(ctr*100).toFixed(2)+'%'],
  ].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><small>시간대 {r.data.timeZone} · 조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST · ARPU=수익/기간활성{g?`(${g.activeUsers.toLocaleString()})`:''}</small>{r.data.limited&&<p>보고서에 제한 또는 누락 경고가 있습니다.</p>}</>}</article>;})}
  </div>}
- {!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 예상 수익 · ARPDAU</h2><span>AdMob · 앱별</span></div><TrendChart series={[...chartSeries,...arpdauSeries]}/></div>}
+ {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 예상 수익 · ARPDAU</h2><span>AdMob · 앱별</span></div><TrendChart series={[...chartSeries,...arpdauSeries]}/></div>}
  {!loading&&targets.map(a=>{
   const r=results[a.id];if(!r||r.status!=='success')return null;
   const g=users[a.id];const active=g?.activeUsers;

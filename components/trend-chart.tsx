@@ -1,25 +1,32 @@
 import {useMemo,useRef,useState} from 'react';
 import {aggregatePoints,formatBucketLabel,type Granularity,type Point} from '@/lib/chart-aggregate.mts';
 type ChartType='line'|'column';
-type Series={name:string;color:string;dashed?:boolean;points:Point[];aggregate?:'sum'|'avg'};
+type Series={name:string;color:string;dashed?:boolean;points:Point[];aggregate?:'sum'|'avg';format?:'number'|'usd'};
 
-function fmtValue(v:number){
+function fmtValue(v:number,format?:'number'|'usd'){
  if(!Number.isFinite(v))return '—';
+ if(format==='usd'){
+  const a=Math.abs(v);
+  if(a>=100)return '$'+Math.round(v).toLocaleString();
+  return '$'+(Math.round(v*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+ }
  const a=Math.abs(v);
  if(a>=1000)return Math.round(v).toLocaleString();
  if(a>=10)return (Math.round(v*10)/10).toLocaleString();
  return (Math.round(v*100)/100).toLocaleString();
 }
 
-export default function TrendChart({series,height=180,defaultType='line',defaultGranularity='day',showGranularity=true}:{series:Series[];height?:number;defaultType?:ChartType;defaultGranularity?:Granularity;showGranularity?:boolean}){
+export default function TrendChart({series,height=180,defaultType='line',defaultGranularity='day',showGranularity=true,showToggles=true}:{series:Series[];height?:number;defaultType?:ChartType;defaultGranularity?:Granularity;showGranularity?:boolean;showToggles?:boolean}){
  const [type,setType]=useState<ChartType>(defaultType);
  const [granularity,setGranularity]=useState<Granularity>(defaultGranularity);
  const [hover,setHover]=useState<number|null>(null);
+ const [enabled,setEnabled]=useState<Record<string,boolean>>({});
  const plotRef=useRef<HTMLDivElement>(null);
- const rolled=useMemo(()=>series.map(s=>({
+ const visible=useMemo(()=>series.filter(s=>enabled[s.name]!==false),[series,enabled]);
+ const rolled=useMemo(()=>visible.map(s=>({
   ...s,
   points:aggregatePoints(s.points,granularity,s.aggregate||'sum'),
- })),[series,granularity]);
+ })),[visible,granularity]);
  const all=rolled.flatMap(s=>s.points.map(p=>p.value));
  const max=Math.max(1,...all);
  const width=700;
@@ -48,13 +55,24 @@ export default function TrendChart({series,height=180,defaultType='line',default
  const hoverDate=hover!=null?dates[hover]:null;
  const tipRows=hoverDate?rolled.map(s=>{
   const pt=s.points.find(p=>p.date===hoverDate);
-  return {name:s.name,color:s.color,value:pt?.value};
- }).filter(r=>r.value!==undefined) as {name:string;color:string;value:number}[]:[];
+  return {name:s.name,color:s.color,value:pt?.value,format:s.format};
+ }).filter(r=>r.value!==undefined) as {name:string;color:string;value:number;format?:'number'|'usd'}[]:[];
  const tipLeft=hover!=null&&dates.length?`${(x(hover)/width)*100}%`:'50%';
 
  return <div className="trendchart">
+  {showToggles&&!!series.length&&<div className="chart-toggles" role="group" aria-label="시리즈 표시">
+   {series.map(s=>{
+    const on=enabled[s.name]!==false;
+    return <button type="button" key={s.name} className={'chart-toggle'+(on?' on':'')} aria-pressed={on}
+     onClick={()=>setEnabled(prev=>({...prev,[s.name]:!on}))}>
+     <i style={{background:on?(s.dashed?'transparent':s.color):'#ddd',borderBottom:s.dashed&&on?`2px dashed ${s.color}`:undefined,height:s.dashed?0:8}}/>
+     {s.name}
+    </button>;
+   })}
+  </div>}
   <div className="trendchart-toolbar">
-   <div className="legend">{rolled.map(s=><span key={s.name}><i style={{background:s.dashed?'transparent':s.color,borderBottom:s.dashed?`2px dashed ${s.color}`:undefined,height:s.dashed?0:2}}/>{s.name}</span>)}</div>
+   {!showToggles&&<div className="legend">{rolled.map(s=><span key={s.name}><i style={{background:s.dashed?'transparent':s.color,borderBottom:s.dashed?`2px dashed ${s.color}`:undefined,height:s.dashed?0:2}}/>{s.name}</span>)}</div>}
+   {showToggles&&<div className="legend muted">{rolled.length?`${rolled.length}개 표시`:'시리즈를 켜 주세요'}</div>}
    <div className="chartcontrols">
     {showGranularity&&<div className="charttype" role="group" aria-label="집계 단위">
      {([['day','일'],['week','주'],['month','월']] as const).map(([id,label])=>
@@ -90,7 +108,7 @@ export default function TrendChart({series,height=180,defaultType='line',default
     </svg>
     {hoverDate&&!!tipRows.length&&<div className="chart-tip" style={{left:tipLeft}} role="status">
      <strong>{formatBucketLabel(hoverDate)}</strong>
-     {tipRows.map(r=><div key={r.name}><i style={{background:r.color}}/><span>{r.name}</span><b>{fmtValue(r.value)}</b></div>)}
+     {tipRows.map(r=><div key={r.name}><i style={{background:r.color}}/><span>{r.name}</span><b>{fmtValue(r.value,r.format)}</b></div>)}
     </div>}
     <div className="xaxis">{dates.map(d=><span key={d}>{formatBucketLabel(d)}</span>)}</div>
    </div>

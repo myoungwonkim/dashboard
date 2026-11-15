@@ -60,6 +60,12 @@ export function roas(revenue:number|null|undefined,spend:number|null|undefined){
  return revenue/spend;
 }
 
+/** CPI / eCPI = 마케팅 비용 ÷ 신규(또는 설치). 분모가 0이면 null. */
+export function cpi(spend:number|null|undefined,acquisitions:number|null|undefined){
+ if(spend==null||acquisitions==null||!(acquisitions>0)||!Number.isFinite(spend))return null;
+ return spend/acquisitions;
+}
+
 export function fmtSpend(v:number|null|undefined,currency='USD'){
  if(v==null||!Number.isFinite(v))return '—';
  if(currency==='USD')return '$'+v.toFixed(2);
