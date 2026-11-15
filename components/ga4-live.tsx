@@ -5,6 +5,7 @@ import {meanNums,sumNums,weightedMean} from '@/lib/metric-rollups.mts';
 import {retentionTotals} from '@/lib/ga4-cohort.mts';
 import TrendChart from './trend-chart';
 import UsersMap,{type CountryUsers} from './users-map';
+import {recentAppVersions} from '@/lib/app-version.mts';
 type Daily={date:string,active:number,newUsers?:number,sessions?:number};
 type Retention={summary:{d1:number|null;d7:number|null;d14:number|null;d30:number|null;cohorts:number;endOffset:number};rows:{cohort:string;users:number;rates:Record<number,number|null>}[];offsets:number[]};
 type Data={
@@ -131,7 +132,7 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
  {detailData&&!loading&&!!(detailData.firstUser?.length||detailData.countries?.length||detailData.versions?.length)&&<div className={'detail-grid'+(detailData.firstUser?.length&&detailData.countries?.length&&detailData.versions?.length?' cols-3':'')}>
  {!!detailData.firstUser?.length&&<div className="panel"><div className="sectiontitle"><h2>유입</h2><span>Top 10</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>소스 / 매체</th><th>신규</th></tr></thead><tbody>{detailData.firstUser.map(r=><tr key={r.source+'/'+r.medium}><td className="cell-text">{r.source} / {r.medium}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
  {!!detailData.countries?.length&&<div className="panel"><div className="sectiontitle"><h2>국가</h2><span>활성 · 신규</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>국가</th><th>활성</th><th>신규</th></tr></thead><tbody>{detailData.countries.map(r=><tr key={r.country}><td className="cell-text">{r.country}</td><td>{r.activeUsers.toLocaleString()}</td><td>{r.newUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
- {!!detailData.versions?.length&&<div className="panel"><div className="sectiontitle"><h2>앱 버전</h2><span>활성</span></div><div className="tablewrap"><table className="dense"><thead><tr><th>버전</th><th>활성</th></tr></thead><tbody>{detailData.versions.map(r=><tr key={r.version}><td className="cell-text">{r.version}</td><td>{r.activeUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
+ {!!detailData.versions?.length&&<div className="panel"><div className="sectiontitle"><h2>앱 버전</h2><span>최근 5</span></div><div className="tablewrap version-scroll"><table className="dense"><thead><tr><th>버전</th><th>활성</th></tr></thead><tbody>{recentAppVersions(detailData.versions,r=>r.version,5).map(r=><tr key={r.version}><td className="cell-text">{r.version}</td><td>{r.activeUsers.toLocaleString()}</td></tr>)}</tbody></table></div></div>}
  </div>}
  </>}
  <p className="note">Dn 리텐션은 GA4 firstSessionDate 코호트(그날 첫 세션 유저) 기준입니다. Crash-free는 Crashlytics 연동 속성에만 표시됩니다.</p></section>;

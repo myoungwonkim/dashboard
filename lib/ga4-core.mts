@@ -45,7 +45,7 @@ export function reportsBody(q:Query){
   ...core,
   {...base,dimensions:[{name:'firstUserSource'},{name:'firstUserMedium'}],metrics:[{name:'newUsers'}],orderBys:[{metric:{metricName:'newUsers'},desc:true}],limit:'10',keepEmptyRows:false},
   {...base,dimensions:[{name:'countryId'},{name:'country'}],metrics:[{name:'activeUsers'},{name:'newUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'250',keepEmptyRows:false},
-  {...base,dimensions:[{name:'appVersion'}],metrics:[{name:'activeUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'10',keepEmptyRows:false},
+  {...base,dimensions:[{name:'appVersion'}],metrics:[{name:'activeUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'50',keepEmptyRows:false},
  ]};
 }
 export function crashBody(q:Query){
