@@ -1,6 +1,8 @@
 import {useEffect,useState} from 'react';
 import {seal} from '@/lib/admob-crypto.mjs';
 import type {AppRecord} from '@/lib/apps';
+import {LabelText} from './field-help';
+import {HELP} from '@/lib/connection-help';
 
 type Account={id:string;platform:string;label:string;appId:string;externalId:string;lastSyncAt:string|null;lastError:string|null};
 type Setup={accounts:Account[];publicKey:JsonWebKey;kid:string};
@@ -141,14 +143,14 @@ export default function MarketingSetup({apps}:{apps:AppRecord[]}){
     <label>플랫폼<select value={platform} onChange={e=>setPlatform(e.target.value as 'google_ads'|'meta')}><option value="meta">Meta</option><option value="google_ads">Google Ads</option></select></label>
     <label>귀속 앱<select value={apiApp} onChange={e=>setApiApp(e.target.value)}>{apps.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
     {platform==='meta'?<>
-     <label>Access token<input type="password" value={accessToken} onChange={e=>setAccessToken(e.target.value)} autoComplete="off"/></label>
-     <label>Ad account ID<input value={adAccountId} onChange={e=>setAdAccountId(e.target.value)} placeholder="act_…"/></label>
+     <label><LabelText help={HELP.metaAccessToken}>Access token</LabelText><input type="password" value={accessToken} onChange={e=>setAccessToken(e.target.value)} autoComplete="off"/></label>
+     <label><LabelText help={HELP.metaAdAccountId}>Ad account ID</LabelText><input value={adAccountId} onChange={e=>setAdAccountId(e.target.value)} placeholder="act_…"/></label>
     </>:<>
-     <label>client_id<input value={clientId} onChange={e=>setClientId(e.target.value)} autoComplete="off"/></label>
-     <label>client_secret<input type="password" value={clientSecret} onChange={e=>setClientSecret(e.target.value)} autoComplete="off"/></label>
-     <label>refresh_token<input type="password" value={refreshToken} onChange={e=>setRefreshToken(e.target.value)} autoComplete="off"/></label>
-     <label>developer_token<input type="password" value={developerToken} onChange={e=>setDeveloperToken(e.target.value)} autoComplete="off"/></label>
-     <label>customer_id<input value={customerId} onChange={e=>setCustomerId(e.target.value)} placeholder="123-456-7890"/></label>
+     <label><LabelText help={HELP.googleAdsClientId}>client_id</LabelText><input value={clientId} onChange={e=>setClientId(e.target.value)} autoComplete="off"/></label>
+     <label><LabelText help={HELP.googleAdsClientSecret}>client_secret</LabelText><input type="password" value={clientSecret} onChange={e=>setClientSecret(e.target.value)} autoComplete="off"/></label>
+     <label><LabelText help={HELP.googleAdsRefreshToken}>refresh_token</LabelText><input type="password" value={refreshToken} onChange={e=>setRefreshToken(e.target.value)} autoComplete="off"/></label>
+     <label><LabelText help={HELP.googleAdsDeveloperToken}>developer_token</LabelText><input type="password" value={developerToken} onChange={e=>setDeveloperToken(e.target.value)} autoComplete="off"/></label>
+     <label><LabelText help={HELP.googleAdsCustomerId}>customer_id</LabelText><input value={customerId} onChange={e=>setCustomerId(e.target.value)} placeholder="123-456-7890"/></label>
     </>}
     <button type="button" className="setupbutton" disabled={busy||!setup||!apiApp} onClick={()=>void saveApi()}>API 계정 저장</button>
    </div>

@@ -5,22 +5,15 @@ import {useEffect,useMemo,useState} from 'react';
 import Link from '@/client/navigation';
 import {useRouter} from '@/client/navigation';
 import {ArrowUpRight,Check,ChevronDown,ChevronRight,RefreshCw} from 'lucide-react';
-import {appBadges,type AppRecord} from '@/lib/apps';
+import {type AppRecord} from '@/lib/apps';
 import {appColor} from '@/lib/app-colors';
 import AppIcon from './app-icon';
 import GA4Live from './ga4-live';
-import GA4Setup from './ga4-setup';
-import AdmobSetup from './admob-setup';
 import AdmobLive from './admob-live';
-import AppForm from './app-form';
-import PlaySetup from './play-setup';
-import AscSetup from './asc-setup';
 import StoreLive from './store-live';
-import StoreBatchPanel from './store-batch-panel';
-import MarketingSetup from './marketing-setup';
 import MarketingLive from './marketing-live';
+import ConnectionsPage from './connections-page';
 import PagePicker from './page-picker';
-import {admobPublisherId} from '@/lib/admob-config';
 import {adArpu,fmtUsd} from '@/lib/arpu.mts';
 const tasks=[
 ['화면 구조와 디자인 확정','완료','B 앱 비교형 메인 / C 서비스별 분석형 앱 상세. 흑백·회색 중심.'],
@@ -76,7 +69,6 @@ export default function Dashboard({page}:{page:string}){
  const codeDone=11+Number(ga4Verified);
  const doneBase=codeDone+Number(admobVerified);
  const progressLabel=`진행상황 ${doneBase}/13`;
- const missingAsc=apps.filter(a=>!a.appleAppId);
  const needsSetup=!ga4Verified||!admobVerified||apps.some(a=>!a.androidPkg)||!playSetup?.gcsBucket;
  const overviewGa4Errors=apps.map(a=>compare[a.id]?.ga4Error?`${a.name}: ${compare[a.id]!.ga4Error}`:'').filter(Boolean);
  const playInstallGap=apps.some(a=>a.androidPkg&&compare[a.id]?.store&&compare[a.id]!.store!.playInstalls==null);
@@ -173,16 +165,16 @@ export default function Dashboard({page}:{page:string}){
   +Number(!overviewPlayErrors.length&&page==='overview'&&!!playSetup&&!playSetup.gcsBucket&&!!apps.some(a=>a.androidPkg));
 
  const checklist=[
-  {ok:ga4Verified,label:'GA4 서비스 계정 · 속성 조회',href:'#ga4'},
-  {ok:admobVerified,label:'AdMob OAuth · 수익 조회',href:'#admob'},
-  {ok:!!playSetup?.configured,label:'Play 서비스 계정 JSON',href:'#play'},
-  {ok:!!playSetup?.gcsBucket,label:'Play GCS 버킷 (설치 CSV)',href:'#play'},
-  {ok:apps.every(a=>!!a.androidPkg),label:'앱별 Android 패키지명',href:'#apps'},
+  {ok:ga4Verified,label:'GA4 서비스 계정 · 속성 조회',href:'#ga4',tab:'ga4' as const},
+  {ok:admobVerified,label:'AdMob OAuth · 수익 조회',href:'#admob',tab:'admob' as const},
+  {ok:!!playSetup?.configured,label:'Play 서비스 계정 JSON',href:'#play',tab:'play' as const},
+  {ok:!!playSetup?.gcsBucket,label:'Play GCS 버킷 (설치 CSV)',href:'#play',tab:'play' as const},
+  {ok:apps.every(a=>!!a.androidPkg),label:'앱별 Android 패키지명',href:'#apps',tab:'apps' as const},
  ];
 
  return <div className="shell">
  <button type="button" className="float-refresh" disabled={refreshing} onClick={refreshPage} aria-label="데이터 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button>
- <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'필수 연결을 위에서부터 순서대로 완료하세요.'}</p></div><div className="titleactions">{page==='connections'&&!showForm&&!editing&&<button type="button" className="setupbutton" onClick={()=>{setEditing(null);setShowForm(true);}}>앱 추가</button>}</div></div>
+ <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?(current.androidPkg||current.id):page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'왼쪽에서 항목을 고르고, 입력칸 옆 ?로 최신 콘솔 경로를 확인하세요.'}</p></div></div>
  {appsError&&<div className="notice" role="status"><span className="dot"/>{appsError}<button type="button" className="refresh" onClick={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}>다시 시도</button></div>}
  {report&&<><div className="noticefold">
   <button type="button" className="noticefold-toggle" aria-expanded={showNotices} onClick={()=>setShowNotices(v=>!v)}>
@@ -235,25 +227,18 @@ export default function Dashboard({page}:{page:string}){
  <p className="note">「원본 콘솔 수치 대조」가 완료되면 Progress에서 대기로 남아 있어도 실사용에는 문제 없습니다. 수치만 직접 확인하면 됩니다.</p>
  </section>
  {tasks.map(([name,originalStatus,originalDetail],i)=>{const verified=(name==='GA4 인증 등록 화면'&&ga4Verified)||(name.startsWith('AdMob')&&admobVerified);const status=verified?'완료':originalStatus,detail=verified?(name.startsWith('AdMob')?'실제 AdMob 보고서 조회 성공을 확인했습니다.':'등록된 앱의 실제 GA4 보고서 조회 성공을 확인했습니다.'):originalDetail;const done=status==='완료'||status==='코드 완료'||status==='제외';return <article className="task" key={name}><span className={'taskicon '+(done?'done':'')}>{done?<Check size={16}/>:String(i+1).padStart(2,'0')}</span><div><h2>{name}</h2><p>{detail}</p></div><span className="status">{status}</span></article>})}<p className="note">P0–P3 기능 코드는 배포된 상태입니다. 「대기」는 본인 계정 연결·수치 대조만 남았다는 뜻입니다.</p></>}
- {page==='connections'&&<>
- <section className="verifychecklist" id="checklist"><div className="sectiontitle"><h2>필수 연결 체크</h2><span>{checklist.filter(c=>c.ok).length}/{checklist.length}</span></div>
- <ul className="checklist">{checklist.map(c=><li key={c.label} className={c.ok?'ok':''}><span>{c.ok?'✓':'○'}</span><a href={c.href}>{c.label}</a></li>)}</ul>
- <p className="note">Play 설치 = ① JSON 키 → ② GCS 버킷 → ③ 스토어 배치. 버킷만 있어도 실시간 CSV 합계는 가능합니다.</p>
- </section>
- {(showForm||editing)&&<section className="ga4setup" id="apps"><div className="sectiontitle"><h2>{editing?'앱 수정':'앱 추가'}</h2></div><AppForm initial={editing||undefined} onCancel={()=>{setShowForm(false);setEditing(null);}} onSaved={app=>{setApps(list=>{const next=list.filter(a=>a.id!==app.id);next.push(app);return next.sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));});setShowForm(false);setEditing(null);if(!editing)router.push(`/apps/${app.id}`);}}/></section>}
- <div className="sectiontitle" id="apps"><h2>등록된 앱</h2><span>{apps.length} active</span></div>
- {appsError&&<p className="note" role="status">{appsError}</p>}
- {!appsError&&!apps.length&&appsLoaded&&<div className="empty"><h2>시드 앱이 없습니다</h2><p>D1 마이그레이션 적용 후 새로고침하거나 앱을 추가하세요.</p></div>}
- <div className="appslist">{apps.map(a=>{const b=appBadges(a);return <div className="approw" key={a.id}><AppIcon app={a}/><div className="meta"><strong><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/><Link href={`/apps/${a.id}`}>{a.name}</Link></strong><span>{a.id}{a.androidPkg?` · ${a.androidPkg}`:''}{a.appleAppId?` · ASC ${a.appleAppId}`:''}</span></div><div className="badges"><span className={'pill '+(b.ga4?'ok':'warn')}>GA4</span><span className={'pill '+(b.admob?'ok':'warn')}>AdMob</span><span className={'pill '+(b.play?'ok':'warn')}>Play</span><span className={'pill '+(b.asc?'ok':'warn')}>ASC</span><span className="pill">AF 메타</span></div><button type="button" className="refresh" onClick={()=>{setShowForm(false);setEditing(a);}}>수정</button></div>;})}</div>
- {!!missingAsc.length&&<p className="note">iOS 출시 전이면 ASC/Apple ID는 나중에 넣으면 됩니다. 출시 후 앱 수정에서 Apple ID를 등록하세요.</p>}
- <div id="ga4"><GA4Setup/></div><div id="admob"><AdmobSetup/></div><div id="play"><PlaySetup/></div><AscSetup/><StoreBatchPanel/>
- <MarketingSetup apps={apps}/>
- <div className="connectionlist">{[
- ['AppsFlyer','무료 Zero — Pull API 없음. 앱 ID만 보관합니다.','유료/트라이얼 전환 시 Aggregate 연동을 검토합니다.'],
- ['마케팅 비용','앱·날짜·비용 수동 입력이 기본. CSV·API는 선택.','Connections → 마케팅 비용.'],
- ['스토어 배치','Play GCS CSV · ASC Sales Report → D1.','매일 UTC 21:00 또는 수동 실행.']
- ].map(([name,first,second])=><section className="connection" key={name}><div className="sectiontitle"><h2>{name}</h2><span className="status">안내</span></div><p>{first}</p><p>{second}</p></section>)}</div>
- <section className="projectids"><h2>AdMob 게시자</h2><p className="note">게시자 ID: {admobPublisherId} · 앱별 ca-app-pub ID는 앱 행에 저장</p></section>
- </>}
+ {page==='connections'&&<ConnectionsPage
+  apps={apps}
+  appsLoaded={appsLoaded}
+  appsError={appsError}
+  onRetryApps={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}
+  onAppsChange={setApps}
+  checklist={checklist}
+  showForm={showForm}
+  setShowForm={setShowForm}
+  editing={editing}
+  setEditing={setEditing}
+  onSavedNew={(app,isNew)=>{if(isNew)router.push(`/apps/${app.id}`);}}
+ />}
  <nav className="utilitylinks" aria-label="대시보드 관리"><Link href="/">서비스 현황</Link><Link href="/progress">{progressLabel}</Link><Link href="/connections">데이터 연결</Link></nav></main></div></div>;
 }

@@ -1,5 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {seal} from '@/lib/admob-crypto.mjs';
+import {LabelText} from './field-help';
+import {HELP} from '@/lib/connection-help';
 type Setup={configured:boolean;createdAt:string|null;verifiedAt:string|null;gcsBucket:string|null;publicKey:JsonWebKey;kid:string};
 
 /** Accept full gs:// URI or bare bucket name → pubsite_prod_rev_… */
@@ -71,8 +73,8 @@ export default function PlaySetup(){
   </li>
  </ol>
  <div className="setupactions">
-  <label className="filelabel">서비스 계정 JSON<input ref={input} type="file" accept=".json,application/json" disabled={!setup||busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label>
-  <label className="filelabel">GCS 버킷 (여기에 URI/버킷 이름 붙여넣기)<input value={bucket} onChange={e=>setBucket(e.target.value)} onBlur={()=>setBucket(normalizeBucketInput(bucket))} placeholder="pubsite_prod_rev_… 또는 gs://pubsite_prod_rev_…/…" disabled={busy} aria-describedby="gcs-bucket-help"/></label>
+  <label className="filelabel"><LabelText help={HELP.playJsonKey}>서비스 계정 JSON</LabelText><input ref={input} type="file" accept=".json,application/json" disabled={!setup||busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label>
+  <label className="filelabel"><LabelText help={HELP.gcsBucket}>GCS 버킷 (URI 붙여넣기)</LabelText><input value={bucket} onChange={e=>setBucket(e.target.value)} onBlur={()=>setBucket(normalizeBucketInput(bucket))} placeholder="pubsite_prod_rev_… 또는 gs://…" disabled={busy} aria-describedby="gcs-bucket-help"/></label>
   <button className="setupbutton" type="button" disabled={!file||!setup||busy} onClick={()=>void connect()}>{busy?'확인 중…':setup?.configured?'키 교체':'암호화하여 연결'}</button>
   {setup?.configured&&<button className="refresh" type="button" disabled={busy||!normalizeBucketInput(bucket)} onClick={()=>void saveBucket()}>버킷만 저장</button>}
  </div>

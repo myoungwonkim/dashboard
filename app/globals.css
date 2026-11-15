@@ -121,8 +121,8 @@
 .steps{border-right:1px solid #eee;padding-right:16px}
 .step{padding:12px 10px;border-radius:6px;font-size:12px;color:#888;margin-bottom:4px}
 .step.on{background:#eaeae7;color:#242424;font-weight:600}
-.form{display:grid;gap:14px;max-width:520px}
-.form label{display:grid;gap:6px;font-size:12px;color:#666}
+.form{display:grid;gap:14px;max-width:520px;overflow:visible}
+.form label{display:grid;gap:6px;font-size:12px;color:#666;position:relative;overflow:visible}
 .form input{border:1px solid #ddd;border-radius:7px;padding:10px;font:inherit}
 .formerror{color:#666;font-size:13px}
 @media(max-width:720px){.wizard{grid-template-columns:1fr}.steps{border:0;display:flex;flex-wrap:wrap;gap:4px;padding:0}.step{margin:0}}
@@ -158,3 +158,49 @@ table.dense td.cell-text,table.dense th.cell-text,.cell-text{text-align:left;whi
 .comparewrap th:first-child,.comparewrap td:first-child{position:sticky;left:0;background:#fff;z-index:1;box-shadow:1px 0 0 #eee}
 .comparewrap th:first-child{background:#fafaf9}
 .comparewrap .applink small{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Connections: side nav + one panel at a time */
+.connpage{display:grid;grid-template-columns:200px minmax(0,1fr);gap:28px;align-items:start;margin-top:8px}
+.connnav{position:sticky;top:16px;display:flex;flex-direction:column;gap:4px;padding:14px 12px;border:1px solid #e8e8e4;border-radius:10px;background:#fafaf8}
+.connnav-title{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#999;padding:2px 8px 10px;margin:0}
+.connnav-item{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:0 8px;align-items:center;width:100%;border:0;background:transparent;text-align:left;font:inherit;padding:10px 10px;border-radius:8px;cursor:pointer;color:#555}
+.connnav-item:hover{background:#efefed}
+.connnav-item.on{background:#eaeae7;color:#1f1f1f}
+.connnav-label{font-size:13px;font-weight:600;grid-column:1}
+.connnav-hint{font-size:10px;color:#999;grid-column:1}
+.connnav-item.on .connnav-hint{color:#777}
+.connnav-dot{width:8px;height:8px;border-radius:50%;grid-column:2;grid-row:1/span 2;background:#d0d0cc}
+.connnav-dot.ok{background:#3a3a38}
+.connnav-dot.warn{background:#b8b8b0}
+.connnav-check{margin-top:14px;padding-top:12px;border-top:1px solid #eee}
+.connnav-check>p{margin:0 0 8px;padding:0 8px;font-size:11px;color:#888}
+.connnav-check ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.connnav-check li button{display:block;width:100%;border:0;background:transparent;text-align:left;font:inherit;font-size:11px;color:#999;padding:6px 8px;border-radius:6px;cursor:pointer}
+.connnav-check li.ok button{color:#444}
+.connnav-check li button:hover{background:#efefed;color:#222}
+.connmain{min-width:0}
+.connmain .ga4setup{margin-bottom:0}
+@media(max-width:900px){
+ .connpage{grid-template-columns:1fr;gap:16px}
+ .connnav{position:static;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;padding:10px}
+ .connnav-title{width:100%;padding:0 4px 4px}
+ .connnav-item{width:auto;grid-template-columns:auto;padding:8px 12px}
+ .connnav-hint,.connnav-dot{display:none}
+ .connnav-check{width:100%;margin-top:8px}
+}
+
+/* Field help: visible detailed tooltip (latest console UI paths) */
+.labeltext{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fieldhelp{position:relative;display:inline-flex;align-items:center;vertical-align:middle}
+.fieldhelp-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:1px solid #ddd;border-radius:50%;background:#fff;color:#666;cursor:help;flex-shrink:0}
+.fieldhelp-btn:hover,.fieldhelp.open .fieldhelp-btn,.fieldhelp-btn:focus-visible{border-color:#888;color:#222;outline:none;box-shadow:0 0 0 2px #e8e8e4}
+.fieldhelp-panel{position:absolute;left:0;top:calc(100% + 8px);z-index:80;width:min(420px,92vw);max-height:min(70vh,520px);overflow:auto;padding:14px 16px 16px;border:1px solid #e0e0da;border-radius:10px;background:#fff;box-shadow:0 14px 40px #0000001f;color:#333;font-size:12px;line-height:1.55;text-align:left;white-space:normal}
+.fieldhelp-panel[hidden]{display:none!important}
+.fieldhelp-title{display:block;font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:10px}
+.fieldhelp-steps{margin:0;padding-left:18px}
+.fieldhelp-steps li{margin:0 0 8px;color:#444}
+.fieldhelp-steps li:last-child{margin-bottom:0}
+.fieldhelp-note{margin:12px 0 0;padding:10px 12px;background:#f6f6f4;border-radius:7px;color:#555;font-size:11px;line-height:1.5}
+.fieldhelp-link{display:inline-block;margin-top:12px;font-size:12px;font-weight:500;color:#222;text-decoration:underline;text-underline-offset:2px}
+.fieldhelp-link:hover{color:#000}
+.form .labeltext,.filelabel .labeltext{font-size:inherit;color:inherit}

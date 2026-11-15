@@ -1,5 +1,7 @@
 import {useEffect,useState} from 'react';
 import {seal} from '@/lib/admob-crypto.mjs';
+import {LabelText} from './field-help';
+import {HELP} from '@/lib/connection-help';
 type Setup={configured:boolean;createdAt:string|null;verifiedAt:string|null;publicKey:JsonWebKey;kid:string};
 export default function AscSetup(){
  const [setup,setSetup]=useState<Setup|null>(null),[issuerId,setIssuerId]=useState(''),[keyId,setKeyId]=useState(''),[privateKey,setPrivateKey]=useState(''),[vendorNumber,setVendorNumber]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('App Store Connect 연결 상태 확인 중…');
@@ -33,11 +35,11 @@ export default function AscSetup(){
   <li>앱별 Apple ID는 앱 행의 appleAppId에 저장합니다.</li>
  </ol>
  <div className="form" style={{marginTop:16}}>
-  <label>Issuer ID (UUID)<input value={issuerId} onChange={e=>setIssuerId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" disabled={busy} autoComplete="off"/></label>
+  <label><LabelText help={HELP.ascIssuerId}>Issuer ID (UUID)</LabelText><input value={issuerId} onChange={e=>setIssuerId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" disabled={busy} autoComplete="off"/></label>
   {issuerId&&!issuerOk&&<p className="formerror" role="status">이름이 아니라 키 페이지에 보이는 UUID를 넣으세요. 지금 값으로는 버튼이 활성화되지 않습니다.</p>}
-  <label>Key ID<input value={keyId} onChange={e=>setKeyId(e.target.value)} placeholder="ABCDEFGHIJ" disabled={busy} autoComplete="off"/></label>
-  <label>Vendor Number (선택)<input value={vendorNumber} onChange={e=>setVendorNumber(e.target.value)} placeholder="12345678" disabled={busy}/></label>
-  <label>.p8 개인키<textarea value={privateKey} onChange={e=>setPrivateKey(e.target.value)} rows={6} placeholder="-----BEGIN PRIVATE KEY-----" disabled={busy} style={{font:'inherit',padding:10,border:'1px solid #ddd',borderRadius:7}}/></label>
+  <label><LabelText help={HELP.ascKeyId}>Key ID</LabelText><input value={keyId} onChange={e=>setKeyId(e.target.value)} placeholder="ABCDEFGHIJ" disabled={busy} autoComplete="off"/></label>
+  <label><LabelText help={HELP.ascVendorNumber}>Vendor Number (선택)</LabelText><input value={vendorNumber} onChange={e=>setVendorNumber(e.target.value)} placeholder="12345678" disabled={busy}/></label>
+  <label><LabelText help={HELP.ascPrivateKey}>.p8 개인키</LabelText><textarea value={privateKey} onChange={e=>setPrivateKey(e.target.value)} rows={6} placeholder="-----BEGIN PRIVATE KEY-----" disabled={busy} style={{font:'inherit',padding:10,border:'1px solid #ddd',borderRadius:7}}/></label>
  </div>
  <div className="setupactions"><button className="setupbutton" type="button" disabled={!canSubmit} onClick={()=>void connect()}>{busy?'확인 중…':setup?.configured?'키 교체':'암호화하여 연결'}</button></div>
  {!canSubmit&&blockReason&&<p className="note" role="status">{blockReason}</p>}

@@ -1,5 +1,7 @@
 import {useState,type ChangeEvent} from 'react';
 import type {AppRecord} from '@/lib/apps';
+import {LabelText} from './field-help';
+import {HELP} from '@/lib/connection-help';
 type Draft={id:string;name:string;symbol:string;ga4PropertyId:string;firebaseProjectId:string;androidPkg:string;iosBundleId:string;appleAppId:string;admobAndroidAppId:string;admobIosAppId:string;afAndroidId:string;afIosId:string};
 const blank=():Draft=>({id:'',name:'',symbol:'',ga4PropertyId:'',firebaseProjectId:'',androidPkg:'',iosBundleId:'',appleAppId:'',admobAndroidAppId:'',admobIosAppId:'',afAndroidId:'',afIosId:''});
 function fromApp(app:AppRecord):Draft{
@@ -44,21 +46,21 @@ export default function AppForm({initial,onSaved,onCancel}:{initial?:AppRecord;o
     <label>심볼(선택)<input value={draft.symbol} onChange={set('symbol')} placeholder="命"/></label>
    </>}
    {step===1&&<>
-    <label>GA4 속성 ID<input value={draft.ga4PropertyId} onChange={set('ga4PropertyId')} placeholder="550050295"/></label>
-    <label>Firebase 프로젝트 ID(선택)<input value={draft.firebaseProjectId} onChange={set('firebaseProjectId')}/></label>
+    <label><LabelText help={HELP.ga4PropertyId}>GA4 속성 ID</LabelText><input value={draft.ga4PropertyId} onChange={set('ga4PropertyId')} placeholder="550050295"/></label>
+    <label><LabelText help={HELP.firebaseProjectId}>Firebase 프로젝트 ID(선택)</LabelText><input value={draft.firebaseProjectId} onChange={set('firebaseProjectId')}/></label>
    </>}
    {step===2&&<>
-    <label>AdMob Android 앱 ID<input value={draft.admobAndroidAppId} onChange={set('admobAndroidAppId')} placeholder="ca-app-pub-…~…"/></label>
-    <label>AdMob iOS 앱 ID<input value={draft.admobIosAppId} onChange={set('admobIosAppId')}/></label>
+    <label><LabelText help={HELP.admobAndroidAppId}>AdMob Android 앱 ID</LabelText><input value={draft.admobAndroidAppId} onChange={set('admobAndroidAppId')} placeholder="ca-app-pub-…~…"/></label>
+    <label><LabelText help={HELP.admobIosAppId}>AdMob iOS 앱 ID</LabelText><input value={draft.admobIosAppId} onChange={set('admobIosAppId')}/></label>
    </>}
    {step===3&&<>
-    <label>Android 패키지<input value={draft.androidPkg} onChange={set('androidPkg')} placeholder="com.nolsoopgames.app"/></label>
-    <label>iOS 번들 ID(선택)<input value={draft.iosBundleId} onChange={set('iosBundleId')} placeholder="com.nolsoopgames.app"/></label>
-    <label>App Store Apple ID(선택)<input value={draft.appleAppId} onChange={set('appleAppId')} placeholder="숫자만 · ASC 앱 상세"/></label>
+    <label><LabelText help={HELP.androidPkg}>Android 패키지</LabelText><input value={draft.androidPkg} onChange={set('androidPkg')} placeholder="com.nolsoopgames.app"/></label>
+    <label><LabelText help={HELP.iosBundleId}>iOS 번들 ID(선택)</LabelText><input value={draft.iosBundleId} onChange={set('iosBundleId')} placeholder="com.nolsoopgames.app"/></label>
+    <label><LabelText help={HELP.appleAppId}>App Store Apple ID(선택)</LabelText><input value={draft.appleAppId} onChange={set('appleAppId')} placeholder="숫자만 · ASC 앱 상세"/></label>
    </>}
    {step===4&&<>
-    <label>AppsFlyer Android ID(예비)<input value={draft.afAndroidId} onChange={set('afAndroidId')}/></label>
-    <label>AppsFlyer iOS ID(예비)<input value={draft.afIosId} onChange={set('afIosId')}/></label>
+    <label><LabelText help={HELP.afAndroidId}>AppsFlyer Android ID(예비)</LabelText><input value={draft.afAndroidId} onChange={set('afAndroidId')}/></label>
+    <label><LabelText help={HELP.afIosId}>AppsFlyer iOS ID(예비)</LabelText><input value={draft.afIosId} onChange={set('afIosId')}/></label>
     <p className="note">무료 요금제에서는 Pull API가 없어 대시보드에 설치·캠페인 수치를 자동 수집하지 않습니다.</p>
    </>}
    {step===5&&<div className="livecard"><h3>저장 요약</h3><dl>

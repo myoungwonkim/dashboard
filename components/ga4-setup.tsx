@@ -1,6 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import Link from '@/client/navigation';
 import {encryptAccount,expectedEmail} from '@/lib/ga4-envelope.mjs';
+import {LabelText} from './field-help';
+import {HELP} from '@/lib/connection-help';
 type Check={app:string;propertyId:string;ok:boolean;code:string};
 type Setup={checks:Check[];checkedAt:string|null;configured:boolean;createdAt:string|null;publicKey:JsonWebKey;kid:string};
 const checkHelp=(code:string)=>code==='api_disabled'?'Google Cloud 프로젝트의 Google Analytics Data API가 비활성화되어 있습니다.'
@@ -39,7 +41,7 @@ export default function GA4Setup(){
  {showUpload&&setup&&<>
  <ol><li><a href="https://console.cloud.google.com/iam-admin/serviceaccounts/details/112806435627414481090/keys?project=sudoku-master-8998c" target="_blank" rel="noreferrer">서비스 계정의 키 페이지 열기 ↗</a><p>Google 계정: nolsoop.games@gmail.com</p></li><li>키 추가 → 새 키 만들기 → JSON → 만들기</li><li>다운로드한 JSON을 선택합니다. 이메일은 아래와 같아야 합니다.</li></ol>
  <p className="accountemail">{expectedEmail}</p>
- <div className="setupactions"><label className="filelabel">JSON 키 파일<input ref={input} type="file" accept=".json,application/json" disabled={busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label><button className="setupbutton" type="button" disabled={!file||busy} onClick={()=>void connect(setup.configured?'replace':'upload')}>{busy?'앱 확인 중…':setup.configured?'암호화하여 교체':'암호화하여 연결'}</button>{replaceMode&&<button type="button" className="refresh" disabled={busy} onClick={()=>{setReplaceMode(false);setFile(null);if(input.current)input.current.value='';}}>교체 취소</button>}</div>
+ <div className="setupactions"><label className="filelabel"><LabelText help={HELP.ga4JsonKey}>JSON 키 파일</LabelText><input ref={input} type="file" accept=".json,application/json" disabled={busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label><button className="setupbutton" type="button" disabled={!file||busy} onClick={()=>void connect(setup.configured?'replace':'upload')}>{busy?'앱 확인 중…':setup.configured?'암호화하여 교체':'암호화하여 연결'}</button>{replaceMode&&<button type="button" className="refresh" disabled={busy} onClick={()=>{setReplaceMode(false);setFile(null);if(input.current)input.current.value='';}}>교체 취소</button>}</div>
  <p className="note">파일은 이 브라우저에서 암호화한 뒤 서버로 전송합니다. 키 내용은 화면에 표시하지 않습니다.</p>
  </>}
  {failed&&<button type="button" className="refresh" onClick={()=>void refresh()} disabled={busy}>연결 상태 다시 확인</button>}
