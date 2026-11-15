@@ -100,9 +100,11 @@
 .sortth{display:inline-flex;align-items:center;justify-content:inherit;gap:4px;max-width:100%}
 .sortth-label{min-width:0}
 .sortth-btns{display:inline-flex;flex-direction:column;gap:0;flex-shrink:0;margin-left:2px;vertical-align:middle}
-.sortth-btn{display:inline-flex;align-items:center;justify-content:center;width:14px;height:10px;padding:0;border:0;background:transparent;color:#c4c4c0;cursor:pointer;line-height:0}
-.sortth-btn:hover{color:#666}
-.sortth-btn.on{color:#222}
+.sortth-btn{display:inline-flex;align-items:center;justify-content:center;width:14px;height:10px;padding:0;border:0;border-radius:2px;background:transparent;color:#d0d0cc;cursor:pointer;line-height:0}
+.sortth-btn:hover{color:#666;background:#f0f0ec}
+.sortth-btn.on{color:#1a1a1a;background:#e8e8e4}
+.sortth-btn.on:hover{color:#111;background:#e0e0dc}
+.sortth-btn:focus{outline:none}
 .sortth-btn:focus-visible{outline:1px solid #777;outline-offset:1px}
 th .sortth{width:100%}
 td .sortth,th:first-child .sortth{justify-content:flex-start}

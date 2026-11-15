@@ -16,10 +16,10 @@ export default function SortTh({
   <span className="sortth">
    <span className="sortth-label">{label}</span>
    <span className="sortth-btns" role="group" aria-label={`${label} 정렬`}>
-    <button type="button" className={'sortth-btn'+(active==='asc'?' on':'')} aria-label={`${label} 오름차순`} aria-pressed={active==='asc'} onClick={e=>{e.stopPropagation();onSort(sortKey,'asc');}}>
+    <button type="button" className={'sortth-btn'+(active==='asc'?' on':'')} aria-label={`${label} 오름차순`} aria-pressed={active==='asc'} onMouseDown={e=>e.preventDefault()} onClick={e=>{e.stopPropagation();onSort(sortKey,'asc');}}>
      <ChevronUp size={11} strokeWidth={2.5}/>
     </button>
-    <button type="button" className={'sortth-btn'+(active==='desc'?' on':'')} aria-label={`${label} 내림차순`} aria-pressed={active==='desc'} onClick={e=>{e.stopPropagation();onSort(sortKey,'desc');}}>
+    <button type="button" className={'sortth-btn'+(active==='desc'?' on':'')} aria-label={`${label} 내림차순`} aria-pressed={active==='desc'} onMouseDown={e=>e.preventDefault()} onClick={e=>{e.stopPropagation();onSort(sortKey,'desc');}}>
      <ChevronDown size={11} strokeWidth={2.5}/>
     </button>
    </span>
