@@ -44,7 +44,7 @@ export function reportsBody(q:Query){
  return {requests:[
   ...core,
   {...base,dimensions:[{name:'firstUserSource'},{name:'firstUserMedium'}],metrics:[{name:'newUsers'}],orderBys:[{metric:{metricName:'newUsers'},desc:true}],limit:'10',keepEmptyRows:false},
-  {...base,dimensions:[{name:'country'}],metrics:[{name:'activeUsers'},{name:'newUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'10',keepEmptyRows:false},
+  {...base,dimensions:[{name:'countryId'},{name:'country'}],metrics:[{name:'activeUsers'},{name:'newUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'250',keepEmptyRows:false},
   {...base,dimensions:[{name:'appVersion'}],metrics:[{name:'activeUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'10',keepEmptyRows:false},
  ]};
 }
@@ -131,7 +131,15 @@ export function parseReports(body:{reports?:Report[]},q:Query,propertyId:string,
   crashAffectedUsers,crashFreeUsersRate,
   daily:dailyRows,
   firstUser:deep?mapRows(firstUser?.rows,row=>({source:dim(row,0),medium:dim(row,1),newUsers:metric(row,0)})):[],
-  countries:deep?mapRows(country?.rows,row=>({country:dim(row,0),activeUsers:metric(row,0),newUsers:metric(row,1)})):[],
+  countries:deep?mapRows(country?.rows,row=>{
+   const headers=country?.dimensionHeaders?.map(d=>d.name)||[];
+   if(headers[0]==='countryId'){
+    const id=dim(row,0).toUpperCase();
+    if(!/^[A-Z]{2}$/.test(id))return null;
+    return {countryId:id,country:dim(row,1),activeUsers:metric(row,0),newUsers:metric(row,1)};
+   }
+   return {countryId:'',country:dim(row,0),activeUsers:metric(row,0),newUsers:metric(row,1)};
+  }):[],
   versions:deep?mapRows(version?.rows,row=>({version:dim(row,0),activeUsers:metric(row,0)})):[],
   timeZone:timezone,
   limited:limited(total,daily,...(deep?[firstUser!,country!,version!].filter(Boolean) as Report[]:[]),...(crashReport?[crashReport]:[])),

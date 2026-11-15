@@ -4,6 +4,7 @@ import {appColor} from '@/lib/app-colors';
 import {meanNums,sumNums,weightedMean} from '@/lib/metric-rollups.mts';
 import {retentionTotals} from '@/lib/ga4-cohort.mts';
 import TrendChart from './trend-chart';
+import UsersMap,{type CountryUsers} from './users-map';
 type Daily={date:string,active:number,newUsers?:number,sessions?:number};
 type Retention={summary:{d1:number|null;d7:number|null;d14:number|null;d30:number|null;cohorts:number;endOffset:number};rows:{cohort:string;users:number;rates:Record<number,number|null>}[];offsets:number[]};
 type Data={
@@ -12,7 +13,7 @@ type Data={
  crashAffectedUsers?:number|null,crashFreeUsersRate?:number|null,
  timeZone:string,fetchedAt:string,limited:boolean,daily:Daily[],
  firstUser?:{source:string,medium:string,newUsers:number}[],
- countries?:{country:string,activeUsers:number,newUsers:number}[],
+ countries?:CountryUsers[],
  versions?:{version:string,activeUsers:number}[],
  retention?:Retention|null,
  retentionNote?:string|null,
@@ -61,6 +62,19 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
  },[ok]);
  const chartSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];const color=appColor(a.id);return [{name:a.name+' 활성',color,points:r.data.daily.map(d=>({date:d.date,value:d.active}))}];});
  const newUserSeries=targets.flatMap(a=>{const r=results[a.id];if(!r||r.status!=='success')return [];const color=appColor(a.id);return [{name:a.name+' 신규',color,dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.newUsers??0}))}];});
+ const mapRows=useMemo(()=>{
+  const map=new Map<string,CountryUsers>();
+  for(const o of ok){
+   for(const c of o.data.countries||[]){
+    const id=(c.countryId||'').toUpperCase();
+    if(!/^[A-Z]{2}$/.test(id))continue;
+    const prev=map.get(id);
+    if(!prev)map.set(id,{countryId:id,country:c.country,activeUsers:c.activeUsers,newUsers:c.newUsers});
+    else map.set(id,{countryId:id,country:prev.country||c.country,activeUsers:prev.activeUsers+c.activeUsers,newUsers:prev.newUsers+c.newUsers});
+   }
+  }
+  return [...map.values()].sort((a,b)=>b.activeUsers-a.activeUsers);
+ },[ok]);
  const detail=app?results[app]:undefined;
  const detailData=detail?.status==='success'?detail.data:null;
  return <section className="ga4live"><div className="sectiontitle"><h2>Firebase / GA4 실제 데이터</h2><span>{loading?'조회 중…':'GA4'}</span></div><p className="note">각 GA4 속성의 시간대 기준, {startDate} ~ {endDate} ({days}일) · 앱 간 사용자 중복 제거 없음 · 합산=절대값 합 · 리텐션·참여율=가중 평균 · 색=앱, 점선=신규</p>
@@ -96,6 +110,7 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
  ].map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><small>시간대 {result.data.timeZone} · 조회 {new Date(result.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST{result.data.crashAffectedUsers!=null?` · 크래시 영향 ${result.data.crashAffectedUsers.toLocaleString()}명`:''} · D1/D7=리텐션</small>{result.data.limited&&<p>임계값 또는 샘플링 등이 적용된 보고서입니다.</p>}</>}</article>;})}
  </div>
  {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 활성 · 신규 사용자</h2><span>GA4 · 앱별</span></div><TrendChart series={[...chartSeries,...newUserSeries]}/></div>}
+ {!loading&&!!mapRows.length&&<div style={{marginTop:20}}><UsersMap rows={mapRows} title={app?'국가별 사용자':'국가별 사용자 · 앱 합산'}/></div>}
  {!loading&&targets.map(a=>{
   const r=results[a.id];if(!r||r.status!=='success')return null;
   const ret=r.data.retention;

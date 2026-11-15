@@ -84,6 +84,18 @@
 .chart-toggle:hover{border-color:#bbb;color:#333}
 .chart-toggle:focus-visible{outline:2px solid #777;outline-offset:2px}
 .overview-combined{margin:28px 0 8px}
+.users-map{margin-top:0}
+.users-map-frame{position:relative;width:100%;margin-top:8px;background:#f7f7f5;border:1px solid #eee;border-radius:10px;overflow:hidden}
+.users-map-svg{display:block;width:100%;height:auto;max-height:420px}
+.users-map-country{cursor:default;transition:fill .12s ease}
+.users-map-country.has{cursor:pointer}
+.users-map-country.has:hover{stroke:#333;stroke-width:1.5}
+.users-map-tip{position:absolute;z-index:5;transform:translate(12px,12px);min-width:140px;padding:8px 10px;border:1px solid #e5e5e0;border-radius:8px;background:#fff;box-shadow:0 8px 24px #00000014;font-size:11px;color:#555;pointer-events:none}
+.users-map-tip strong{display:block;margin-bottom:6px;color:#222;font-size:12px}
+.users-map-tip>div{display:flex;justify-content:space-between;gap:16px;margin-top:3px}
+.users-map-tip b{font-weight:600;color:#222;font-variant-numeric:tabular-nums}
+.users-map-legend{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:11px;color:#888}
+.users-map-scale{flex:1;max-width:180px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl(40 6% 92%),hsl(40 6% 30%))}
 .marketing-title{flex-wrap:wrap;gap:10px 14px}
 .marketing-title .channel-toggles{margin-left:auto;margin-right:0}
 .channel-toggles{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
