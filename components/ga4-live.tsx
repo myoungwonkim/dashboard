@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import type {AppRecord} from '@/lib/apps';
 import {appColor} from '@/lib/app-colors';
 import {meanNums,sumNums,weightedMean} from '@/lib/metric-rollups.mts';
-import {retentionTotals} from '@/lib/ga4-cohort.mts';
+import {mergeRetentionRows,retentionTotals} from '@/lib/ga4-cohort.mts';
 import TrendChart from './trend-chart';
 import UsersMap,{type CountryUsers} from './users-map';
 import {recentAppVersions} from '@/lib/app-version.mts';
@@ -74,8 +74,10 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
  const viewTargets=useMemo(()=>targets.filter(a=>filter.includes(a.id)),[targets,filter.selected,filter.allOn]);
  const viewOk=useMemo(()=>ok.filter(o=>filter.includes(o.app.id)),[ok,filter.selected,filter.allOn]);
  const retTargets=useMemo(()=>targets.filter(a=>retFilter.includes(a.id)),[targets,retFilter.selected,retFilter.allOn]);
+ const overview=!app;
+ const focus=viewOk.length===1?viewOk[0]:null;
  const totals=useMemo(()=>{
-  if(viewOk.length<2)return null;
+  if(!viewOk.length)return null;
   const activeUsers=sumNums(viewOk.map(o=>o.data.activeUsers))!;
   const sessions=sumNums(viewOk.map(o=>o.data.sessions))!;
   const newUsers=sumNums(viewOk.map(o=>o.data.newUsers??0))!;
@@ -99,12 +101,41 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
   .map(o=>({id:o.app.id,name:o.app.name,countries:o.data.countries||[]}))
   .filter(s=>s.countries.length),
  [ok]);
- const detail=app?results[app]:undefined;
+ const retOk=useMemo(()=>ok.filter(o=>retFilter.includes(o.app.id)&&o.data.retention?.rows?.length),[ok,retFilter.selected,retFilter.allOn]);
+ const mergedRetention=useMemo(()=>{
+  if(!retOk.length)return null;
+  const rows=mergeRetentionRows(retOk.map(o=>o.data.retention!.rows));
+  const endOffset=Math.max(...retOk.map(o=>o.data.retention!.summary.endOffset));
+  const offs=SHOW_OFFSETS.filter(d=>d<=endOffset);
+  const period=retentionTotals(rows,offs);
+  const d1=weightedMean(retOk.map(o=>({value:o.data.retention!.summary.d1,weight:o.data.retention!.summary.cohorts||o.data.newUsers||1})));
+  const d7=weightedMean(retOk.map(o=>({value:o.data.retention!.summary.d7,weight:o.data.retention!.summary.cohorts||o.data.newUsers||1})));
+  const d14=weightedMean(retOk.map(o=>({value:o.data.retention!.summary.d14,weight:o.data.retention!.summary.cohorts||o.data.newUsers||1})));
+  const d30=weightedMean(retOk.map(o=>({value:o.data.retention!.summary.d30,weight:o.data.retention!.summary.cohorts||o.data.newUsers||1})));
+  return {rows,offs,period,d1,d7,d14,d30,cohorts:rows.length,endOffset};
+ },[retOk]);
+ const detail=app?results[app]:(filter.soleId?results[filter.soleId]:undefined);
  const detailData=detail?.status==='success'?detail.data:null;
+ const showDetail=!!app||!!filter.soleId;
  return <section className="ga4live" id="section-ga4"><div className="sectiontitle marketing-title"><div className="marketing-title-row"><h2>Firebase / GA4 실제 데이터</h2><AppToggle apps={appOpts} allOn={filter.allOn} selected={filter.selected} onSelectAll={filter.selectAll} onToggle={filter.toggle} label="GA4 앱"/></div><span>{loading?'조회 중…':filter.label}</span></div><p className="note">각 GA4 속성의 시간대 기준, {startDate} ~ {endDate} ({days}일) · 앱 간 사용자 중복 제거 없음 · 합산=절대값 합 · 리텐션·참여율=가중 평균 · {filter.label}</p>
  {!targets.length?<p className="note">GA4 속성이 연결된 앱이 없습니다. 데이터 연결에서 앱을 추가해 주세요.</p>:<>
  <div className="livegrid" aria-live="polite">
-  {totals&&!loading&&<article className="livecard aggregate"><h3>전체 합산 · 평균 <small>{totals.n}개 앱</small></h3><dl>{[
+  {!loading&&overview&&!viewOk.length&&viewTargets.length>0&&<article className="livecard"><h3>{filter.label}</h3><p role="status">{viewTargets.map(a=>{const r=results[a.id];return r?.status==='error'?r.message:null;}).filter(Boolean).join(' · ')||'연결 상태를 확인하고 있습니다.'}</p></article>}
+  {!loading&&overview&&focus&&<article className="livecard aggregate"><h3><AppMark id={focus.app.id} name={focus.app.name}/></h3><dl>{[
+   ['기간 활성 사용자',focus.data.activeUsers.toLocaleString()],
+   ['일평균 DAU',focus.data.averageDau.toLocaleString()],
+   ['신규 사용자',(focus.data.newUsers??0).toLocaleString()],
+   ['세션',focus.data.sessions.toLocaleString()],
+   ['참여 세션',(focus.data.engagedSessions??0).toLocaleString()],
+   ['참여율',fmtRate(focus.data.engagementRate)],
+   ['세션/사용자',focus.data.sessionsPerUser==null?'—':focus.data.sessionsPerUser.toFixed(2)],
+   ['평균 세션',fmtSec(focus.data.averageSessionDuration)],
+   ['이벤트',focus.data.events.toLocaleString()],
+   ['Crash-free',focus.data.crashFreeUsersRate==null?'—':fmtRate(focus.data.crashFreeUsersRate)],
+   ['리텐션 D1',fmtRate(focus.data.retention?.summary.d1)],
+   ['리텐션 D7',fmtRate(focus.data.retention?.summary.d7)],
+  ].map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><small>시간대 {focus.data.timeZone} · 조회 {new Date(focus.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</small></article>}
+  {!loading&&overview&&!focus&&totals&&<article className="livecard aggregate"><h3>앱 합산 <small>{totals.n}개 앱</small></h3><dl>{[
    ['기간 활성 합',totals.activeUsers.toLocaleString()],
    ['일평균 DAU 합',Math.round(totals.averageDau).toLocaleString()],
    ['신규 합',totals.newUsers.toLocaleString()],
@@ -118,7 +149,7 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
    ['리텐션 D1(가중)',fmtRate(totals.d1)],
    ['리텐션 D7(가중)',fmtRate(totals.d7)],
   ].map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><small>절대값은 합산, 비율·리텐션은 앱별 코호트/세션 가중 평균입니다.</small></article>}
-  {viewTargets.map(a=>{const result=results[a.id];return <article key={a.id} className="livecard"><h3><AppMark id={a.id} name={a.name}/></h3>{!result?<p>연결 상태를 확인하고 있습니다.</p>:result.status==='error'?<p role="status">{result.message}</p>:<><dl>{[
+  {!overview&&viewTargets.map(a=>{const result=results[a.id];return <article key={a.id} className="livecard"><h3><AppMark id={a.id} name={a.name}/></h3>{!result?<p>연결 상태를 확인하고 있습니다.</p>:result.status==='error'?<p role="status">{result.message}</p>:<><dl>{[
   ['기간 활성 사용자',result.data.activeUsers.toLocaleString()],
   ['일평균 DAU',result.data.averageDau.toLocaleString()],
   ['신규 사용자',(result.data.newUsers??0).toLocaleString()],
@@ -136,8 +167,13 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
  {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 활성 · 신규 사용자</h2><span>GA4 · 앱별</span></div><TrendChart series={[...chartSeries,...newUserSeries]}/></div>}
  <div id="section-map">{!loading&&!!mapSources.length&&<div style={{marginTop:20}}><UsersMap sources={mapSources} title="국가별 사용자"/></div>}</div>
  <div id="section-retention">
-  {!loading&&!!retTargets.length&&<div className="sectiontitle marketing-title" style={{marginTop:20}}><div className="marketing-title-row"><h2>리텐션</h2><AppToggle apps={appOpts} allOn={retFilter.allOn} selected={retFilter.selected} onSelectAll={retFilter.selectAll} onToggle={retFilter.toggle} label="리텐션 앱"/></div><span>{retFilter.label}</span></div>}
- {!loading&&retTargets.map(a=>{
+  {!loading&&(overview||!!retTargets.length)&&<div className="sectiontitle marketing-title" style={{marginTop:20}}><div className="marketing-title-row"><h2>리텐션</h2>{overview&&<AppToggle apps={appOpts} allOn={retFilter.allOn} selected={retFilter.selected} onSelectAll={retFilter.selectAll} onToggle={retFilter.toggle} label="리텐션 앱"/>}</div><span>{overview?retFilter.label:'코호트'}</span></div>}
+  {!loading&&overview&&mergedRetention&&<div className="panel" style={{marginTop:12}}><div className="sectiontitle"><h2>{retFilter.label}</h2><span>D0–D{mergedRetention.endOffset} · {mergedRetention.cohorts}코호트</span></div>
+   <p className="note">행=그날에 처음 연 사용자 · 열 Dn=n일 뒤 활성 비율 · 상단 종합=코호트 규모 가중 평균. D1 {fmtRate(mergedRetention.d1)} · D7 {fmtRate(mergedRetention.d7)} · D14 {fmtRate(mergedRetention.d14)} · D30 {fmtRate(mergedRetention.d30)}{retOk.length>1?' · 앱 합산(규모 가중)':''}</p>
+   <RetentionTable rows={mergedRetention.rows} offs={mergedRetention.offs} period={mergedRetention.period}/>
+  </div>}
+  {!loading&&overview&&!mergedRetention&&!!retTargets.length&&<p className="note">선택한 앱의 리텐션을 불러오지 못했습니다.</p>}
+  {!overview&&!loading&&retTargets.map(a=>{
   const r=results[a.id];if(!r||r.status!=='success')return null;
   const ret=r.data.retention;
   if(ret&&ret.rows.length){
@@ -151,7 +187,7 @@ export default function GA4Live({apps,app,days,startDate,endDate,country,os,show
   return <p className="note" key={a.id+'-ret-miss'}><AppMark id={a.id} name={a.name}/>: {r.data.retentionNote||'리텐션을 불러오지 못했습니다.'}</p>;
  })}
  </div>
- {!!app&&<div className={'detail-grid'+(detailData?.firstUser?.length&&detailData?.countries?.length&&detailData?.versions?.length?' cols-3':'')}>
+ {showDetail&&<div className={'detail-grid'+(detailData?.firstUser?.length&&detailData?.countries?.length&&detailData?.versions?.length?' cols-3':'')}>
   <div className="panel" id="section-acquisition"><div className="sectiontitle"><h2>유입</h2><span>Top 10</span></div>
    {!loading&&detailData?.firstUser?.length
     ?<MetricTable rows={detailData.firstUser} rowKey={r=>r.source+'/'+r.medium} defaultSort={{key:'newUsers',dir:'desc'}} columns={[

@@ -146,29 +146,52 @@ export default function MarketingLive({apps,app,days,startDate,endDate,revenueBy
   </div>
   <p className="note">{startDate} ~ {endDate} ({days}일) · {appFilter.label} · 채널: {channelLbl} · CPI = 비용 ÷ GA4 신규 · ROAS = AdMob 수익 ÷ 비용 · <a href="/connections#marketing">비용 입력</a></p>
   <div className="livegrid" aria-live="polite">
-   {totals&&!loading&&viewTargets.length>1&&<article className="livecard aggregate"><h3>전체 합산 <small>{totals.n}개 앱 · {channelLbl}</small></h3><dl>{[
-    ['마케팅 비용',fmtSpend(totals.spend)],
-    [channelAllOn?'eCPI':'CPI',fmtCpi(totals.ecpi)],
-    ['신규(GA4)',totals.newUsers?totals.newUsers.toLocaleString():'—'],
-    ['ROAS',totals.roas==null?'—':totals.roas.toFixed(2)+'x'],
-   ].map(([n,v])=><div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl><small>선택한 앱·채널 비용만 합산합니다. CPI = 비용 ÷ 신규 사용자.</small></article>}
-   {viewTargets.map(a=>{
-    const r=results[a.id];
-    const neu=resolvedNew(a.id);
-    if(!r)return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3><p>비용 조회 중…</p></article>;
-    if(r.status==='error')return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3><p>{r.message}</p><a href="/connections#marketing">마케팅 연결 →</a></article>;
-    const roll=spendFromData(r.data,selected);
-    const spend=roll.spend;
-    return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3>
-     <dl>{[
-      ['마케팅 비용',fmtSpend(spend)],
-      [channelAllOn?'eCPI':'CPI',fmtCpi(cpi(spend,neu))],
-      ['신규(GA4)',neu!=null?neu.toLocaleString():'—'],
-      ['ROAS',roas(revenueByApp?.[a.id],spend)==null?'—':roas(revenueByApp?.[a.id],spend)!.toFixed(2)+'x'],
-     ].map(([n,v])=><div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl>
-     <small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST · {channelLbl}</small>
-    </article>;
-   })}
+   {(()=>{
+    const overview=!app;
+    const sole=appFilter.soleId?viewTargets.find(a=>a.id===appFilter.soleId):null;
+    if(overview){
+     if(loading)return <article className="livecard"><h3>{appFilter.label}</h3><p>비용 조회 중…</p></article>;
+     if(sole){
+      const r=results[sole.id];const neu=resolvedNew(sole.id);
+      if(!r)return <article className="livecard"><h3><AppMark id={sole.id} name={sole.name}/></h3><p>비용 조회 중…</p></article>;
+      if(r.status==='error')return <article className="livecard"><h3><AppMark id={sole.id} name={sole.name}/></h3><p>{r.message}</p><a href="/connections#marketing">마케팅 연결 →</a></article>;
+      const spend=spendFromData(r.data,selected).spend;
+      return <article className="livecard aggregate"><h3><AppMark id={sole.id} name={sole.name}/></h3>
+       <dl>{[
+        ['마케팅 비용',fmtSpend(spend)],
+        [channelAllOn?'eCPI':'CPI',fmtCpi(cpi(spend,neu))],
+        ['신규(GA4)',neu!=null?neu.toLocaleString():'—'],
+        ['ROAS',roas(revenueByApp?.[sole.id],spend)==null?'—':roas(revenueByApp?.[sole.id],spend)!.toFixed(2)+'x'],
+       ].map(([n,v])=><div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl>
+       <small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST · {channelLbl}</small>
+      </article>;
+     }
+     if(!totals)return null;
+     return <article className="livecard aggregate"><h3>앱 합산 <small>{totals.n}개 앱 · {channelLbl}</small></h3><dl>{[
+      ['마케팅 비용',fmtSpend(totals.spend)],
+      [channelAllOn?'eCPI':'CPI',fmtCpi(totals.ecpi)],
+      ['신규(GA4)',totals.newUsers?totals.newUsers.toLocaleString():'—'],
+      ['ROAS',totals.roas==null?'—':totals.roas.toFixed(2)+'x'],
+     ].map(([n,v])=><div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl><small>선택한 앱·채널 비용만 합산합니다. CPI = 비용 ÷ 신규 사용자.</small></article>;
+    }
+    return viewTargets.map(a=>{
+     const r=results[a.id];
+     const neu=resolvedNew(a.id);
+     if(!r)return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3><p>비용 조회 중…</p></article>;
+     if(r.status==='error')return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3><p>{r.message}</p><a href="/connections#marketing">마케팅 연결 →</a></article>;
+     const roll=spendFromData(r.data,selected);
+     const spend=roll.spend;
+     return <article className="livecard" key={a.id}><h3><AppMark id={a.id} name={a.name}/></h3>
+      <dl>{[
+       ['마케팅 비용',fmtSpend(spend)],
+       [channelAllOn?'eCPI':'CPI',fmtCpi(cpi(spend,neu))],
+       ['신규(GA4)',neu!=null?neu.toLocaleString():'—'],
+       ['ROAS',roas(revenueByApp?.[a.id],spend)==null?'—':roas(revenueByApp?.[a.id],spend)!.toFixed(2)+'x'],
+      ].map(([n,v])=><div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl>
+      <small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST · {channelLbl}</small>
+     </article>;
+    });
+   })()}
   </div>
   {showCharts&&!!chartSeries.length&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 마케팅 비용</h2><span>{channelLbl}</span></div><TrendChart series={chartSeries}/></div>}
  </section>;

@@ -40,6 +40,32 @@ export function retentionTotals(rows:RetentionRow[],offsets:number[]){
  return {users,rates};
 }
 
+/** Merge cohort rows from multiple apps by first-session date (users sum, rates weighted). */
+export function mergeRetentionRows(groups:RetentionRow[][]):RetentionRow[]{
+ const map=new Map<string,{users:number;num:Record<number,number>;den:Record<number,number>}>();
+ for(const rows of groups){
+  for(const row of rows){
+   const cur=map.get(row.cohort)||{users:0,num:{},den:{}};
+   const w=row.users||0;
+   cur.users+=w;
+   for(const [k,v] of Object.entries(row.rates)){
+    if(v==null||!Number.isFinite(v)||!(w>0))continue;
+    const d=Number(k);
+    cur.num[d]=(cur.num[d]||0)+v*w;
+    cur.den[d]=(cur.den[d]||0)+w;
+   }
+   map.set(row.cohort,cur);
+  }
+ }
+ return [...map.entries()].sort((a,b)=>b[0].localeCompare(a[0])).map(([cohort,cur])=>{
+  const rates:Record<number,number|null>={};
+  for(const d of new Set([...Object.keys(cur.num),...Object.keys(cur.den)].map(Number))){
+   rates[d]=cur.den[d]?cur.num[d]/cur.den[d]:null;
+  }
+  return {cohort,users:cur.users,rates};
+ });
+}
+
 function dimensionFilter(q:Query,includeAudienceFilters:boolean){
  const expressions:unknown[]=[{filter:{fieldName:'platform',inListFilter:{values:['Android','iOS']}}}];
  if(includeAudienceFilters){
