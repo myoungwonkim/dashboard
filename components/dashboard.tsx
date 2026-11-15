@@ -16,6 +16,7 @@ import OverviewCombined from './overview-combined';
 import ConnectionsPage from './connections-page';
 import PagePicker from './page-picker';
 import MetricTable,{type MetricCol} from './metric-table';
+import SectionJumps,{type SectionJump} from './section-jumps';
 import {adArpu,fmtUsd} from '@/lib/arpu.mts';
 const tasks=[
 ['화면 구조와 디자인 확정','완료','B 앱 비교형 메인 / C 서비스별 분석형 앱 상세. 흑백·회색 중심.'],
@@ -191,8 +192,34 @@ export default function Dashboard({page}:{page:string}){
   {ok:apps.every(a=>!!a.androidPkg),label:'앱별 Android 패키지명',href:'#apps',tab:'apps' as const},
  ];
 
+ const reportJumps=useMemo(():SectionJump[]=>{
+  if(page==='overview')return [
+   {id:'section-compare',label:'앱 비교'},
+   {id:'section-trends',label:'합산 추세'},
+   {id:'section-ga4',label:'GA4'},
+   {id:'section-map',label:'지도'},
+   {id:'section-retention',label:'리텐션'},
+   {id:'section-admob',label:'AdMob'},
+   {id:'section-marketing',label:'마케팅'},
+   {id:'section-store',label:'스토어'},
+  ];
+  if(current)return [
+   {id:'section-trends',label:'핵심 추세'},
+   {id:'section-ga4',label:'GA4'},
+   {id:'section-map',label:'지도'},
+   {id:'section-retention',label:'리텐션'},
+   {id:'section-acquisition',label:'유입'},
+   {id:'section-countries',label:'국가'},
+   {id:'section-versions',label:'앱 버전'},
+   {id:'section-admob',label:'AdMob'},
+   {id:'section-marketing',label:'마케팅'},
+   {id:'section-store',label:'스토어'},
+  ];
+  return [];
+ },[page,current?.id]);
+
  return <div className="shell">
- <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><button type="button" className="refresh header-refresh" disabled={refreshing} onClick={refreshPage} aria-label="데이터 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><h1>{title}</h1><p className="subtitle">{current?'KPI · 추세 · 서비스 섹션 순서는 현황과 같습니다.':page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'왼쪽에서 항목을 고르고, 입력칸 옆 ?로 최신 콘솔 경로를 확인하세요.'}</p></div></div>
+ <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><button type="button" className="refresh header-refresh" disabled={refreshing} onClick={refreshPage} aria-label="데이터 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><div className="title-with-jumps"><h1>{title}</h1>{!!reportJumps.length&&<SectionJumps items={reportJumps}/>}</div><p className="subtitle">{current?'KPI · 추세 · 서비스 섹션 순서는 현황과 같습니다.':page==='overview'?'유입 · 활동 · 수익 핵심만 먼저 봅니다.':page==='progress'?'남은 일은 계정 연결과 콘솔 수치 대조입니다.':'왼쪽에서 항목을 고르고, 입력칸 옆 ?로 최신 콘솔 경로를 확인하세요.'}</p></div></div>
  {appsError&&<div className="notice" role="status"><span className="dot"/>{appsError}<button type="button" className="refresh" onClick={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}>다시 시도</button></div>}
  {report&&<><div className="noticefold">
   <button type="button" className="noticefold-toggle" aria-expanded={showNotices} onClick={()=>setShowNotices(v=>!v)}>
@@ -220,7 +247,7 @@ export default function Dashboard({page}:{page:string}){
    <div className="metric"><span>ROAS</span><strong>{totals.roas!=null?totals.roas.toFixed(2)+'x':'—'}</strong><small>AdMob÷마케팅 비용</small></div>
    <div className="metric"><span>유저당 광고 수익</span><strong>{fmtUsd(totals.arpu)}</strong><small>AdMob÷GA4 활성 · 앱 합산</small></div>
   </div>
-  <div className="sectiontitle"><h2>앱 비교</h2><span>같은 필터 · 행 클릭 시 상세</span></div>
+  <div className="sectiontitle" id="section-compare"><h2>앱 비교</h2><span>같은 필터 · 행 클릭 시 상세</span></div>
  </>}
  {!!current&&(()=>{
   const row=compare[current.id];

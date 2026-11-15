@@ -63,7 +63,7 @@ export default function StoreLive({apps,app,days,startDate,endDate,showCharts=tr
    playN:playOk.length,ascN:ascOk.length,
   };
  },[playOk,ascOk]);
- return <section className="ga4live">
+ return <section className="ga4live" id="section-store">
   <div className="sectiontitle"><h2>스토어 · 유입 본선</h2><span>{loading?'조회 중…':'Play · ASC'}</span></div>
   <p className="note">Play 설치·ASC 다운로드가 유입 1순위입니다. 합산=설치·다운로드 합 · 전환율=앱 평균 · 실선=Play, 점선=ASC</p>
   <div className="livegrid" aria-live="polite">

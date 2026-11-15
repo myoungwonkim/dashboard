@@ -63,7 +63,7 @@ export default function AdmobLive({apps,app,days,startDate,endDate,country,os,sh
   const byDate=new Map(g.daily.map(d=>[d.date,d.active]));
   return [{name:a.name+' ARPDAU',color:appColor(a.id),dashed:true as const,points:r.data.daily.map(d=>{const dau=byDate.get(d.date)||0;return {date:d.date,value:dau>0?d.revenue/dau:0};})}];
  });
- return <section className="ga4live"><div className="sectiontitle"><h2>AdMob 광고 수익</h2><span>{loading?'조회 중…':'AdMob · USD'}</span></div><p className="note">AdMob 네트워크 보고서 · USD · {startDate} ~ {endDate} ({days}일) · 합산=수익·노출 합 · eCPM/CTR/ARPU=합산 후 재계산 · 점선=ARPDAU</p>
+ return <section className="ga4live" id="section-admob"><div className="sectiontitle"><h2>AdMob 광고 수익</h2><span>{loading?'조회 중…':'AdMob · USD'}</span></div><p className="note">AdMob 네트워크 보고서 · USD · {startDate} ~ {endDate} ({days}일) · 합산=수익·노출 합 · eCPM/CTR/ARPU=합산 후 재계산 · 점선=ARPDAU</p>
  {!targets.length?<p className="note">AdMob 앱 ID가 등록된 앱이 없습니다.</p>:<div className="livegrid" aria-live="polite">
   {totals&&!loading&&<article className="livecard aggregate"><h3>전체 합산 · 재계산 <small>{totals.n}개 앱</small></h3><dl>{[
    ['예상 광고 수익 합','$'+totals.revenue.toFixed(2)],

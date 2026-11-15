@@ -125,7 +125,7 @@ export default function MarketingLive({apps,app,days,startDate,endDate,revenueBy
   });
  }
 
- return <section className="ga4live">
+ return <section className="ga4live" id="section-marketing">
   <div className="sectiontitle marketing-title">
    <div className="marketing-title-row">
     <h2>마케팅 비용</h2>

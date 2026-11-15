@@ -129,7 +129,7 @@ export default function OverviewCombined({apps,days,startDate,endDate,country,os
   name:s.name.includes('Play')?(multi?'Play 설치 합':'Play 설치'):(multi?'ASC 다운로드 합':'ASC 다운로드'),
  })),[storeSeries,multi]);
 
- return <section className="overview-combined">
+ return <section className="overview-combined" id="section-trends">
   <div className="sectiontitle"><h2>{multi?'합산 추세':'핵심 추세'}</h2><span>{loading?'조회 중…':(multi?'앱 합 · 시리즈 온/오프':'시리즈 온/오프')}</span></div>
   <p className="note">{multi?'앱별 수치를 날짜별로 합칩니다. ':''}eCPI = 마케팅 비용 ÷ 신규 사용자(GA4) · 기간 eCPI {periodEcpi==null?'—':'$'+periodEcpi.toFixed(2)} · 블록을 눌러 그래프를 켜고 끌 수 있습니다.</p>
   {!!hero.length&&!loading&&<div className="panel"><div className="sectiontitle"><h2>일별 활성 · 신규 · 비용 · eCPI</h2><span>{scopeLabel}</span></div><TrendChart series={hero} height={220}/></div>}
