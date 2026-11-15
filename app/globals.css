@@ -84,6 +84,14 @@
 .chart-toggle:hover{border-color:#bbb;color:#333}
 .chart-toggle:focus-visible{outline:2px solid #777;outline-offset:2px}
 .overview-combined{margin:28px 0 8px}
+.marketing-title{flex-wrap:wrap;gap:10px 14px}
+.marketing-title .channel-toggles{margin-left:auto;margin-right:0}
+.channel-toggles{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+.channel-toggle{border:1px solid #e2e2df;background:#fff;color:#777;border-radius:7px;padding:5px 10px;font:inherit;font-size:11px;cursor:pointer}
+.channel-toggle.on{border-color:#cfcfc9;background:#efefed;color:#222;font-weight:600}
+.channel-toggle:hover{border-color:#bbb;color:#333}
+.channel-toggle:focus-visible{outline:2px solid #777;outline-offset:2px}
+@media(max-width:720px){.marketing-title .channel-toggles{margin-left:0;width:100%}}
 .trendchart .plot{position:relative;touch-action:none}
 .chart-tip{position:absolute;top:8px;transform:translateX(-50%);z-index:2;min-width:140px;max-width:240px;padding:8px 10px;border:1px solid #e5e5e0;border-radius:8px;background:#fff;box-shadow:0 8px 24px #00000014;font-size:11px;color:#555;pointer-events:none}
 .chart-tip strong{display:block;margin-bottom:6px;color:#222;font-size:12px;font-weight:600}
