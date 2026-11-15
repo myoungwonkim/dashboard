@@ -192,11 +192,13 @@ table.dense td.cell-text,table.dense th.cell-text,.cell-text{text-align:left;whi
 /* Field help: visible detailed tooltip (latest console UI paths) */
 .labeltext{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
 .fieldhelp{position:relative;display:inline-flex;align-items:center;vertical-align:middle}
-.fieldhelp-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:1px solid #ddd;border-radius:50%;background:#fff;color:#666;cursor:help;flex-shrink:0}
+.fieldhelp-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:1px solid #ddd;border-radius:50%;background:#fff;color:#666;cursor:pointer;flex-shrink:0}
 .fieldhelp-btn:hover,.fieldhelp.open .fieldhelp-btn,.fieldhelp-btn:focus-visible{border-color:#888;color:#222;outline:none;box-shadow:0 0 0 2px #e8e8e4}
 .fieldhelp-panel{position:absolute;left:0;top:calc(100% + 8px);z-index:80;width:min(420px,92vw);max-height:min(70vh,520px);overflow:auto;padding:14px 16px 16px;border:1px solid #e0e0da;border-radius:10px;background:#fff;box-shadow:0 14px 40px #0000001f;color:#333;font-size:12px;line-height:1.55;text-align:left;white-space:normal}
-.fieldhelp-panel[hidden]{display:none!important}
-.fieldhelp-title{display:block;font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:10px}
+.fieldhelp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.fieldhelp-title{display:block;font-size:13px;font-weight:600;color:#1a1a1a;line-height:1.35;padding-top:1px}
+.fieldhelp-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin:-4px -6px 0 0;padding:0;border:1px solid #e5e5e0;border-radius:6px;background:#fff;color:#666;cursor:pointer;flex-shrink:0}
+.fieldhelp-close:hover,.fieldhelp-close:focus-visible{border-color:#888;color:#222;outline:none;box-shadow:0 0 0 2px #e8e8e4}
 .fieldhelp-steps{margin:0;padding-left:18px}
 .fieldhelp-steps li{margin:0 0 8px;color:#444}
 .fieldhelp-steps li:last-child{margin-bottom:0}
