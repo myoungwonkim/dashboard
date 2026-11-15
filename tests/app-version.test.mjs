@@ -8,7 +8,8 @@ test('compareAppVersions orders semver-ish strings',()=>{
  assert.equal(compareAppVersions('1.0.0','1.0.0'),0);
 });
 
-test('recentAppVersions returns newest five',()=>{
+test('recentAppVersions sorts newest first and can cap',()=>{
  const rows=[{v:'1.0.0'},{v:'1.2.0'},{v:'1.10.0'},{v:'2.0'},{v:'1.9'},{v:'0.9'}];
+ assert.deepEqual(recentAppVersions(rows,r=>r.v).map(r=>r.v),['2.0','1.10.0','1.9','1.2.0','1.0.0','0.9']);
  assert.deepEqual(recentAppVersions(rows,r=>r.v,5).map(r=>r.v),['2.0','1.10.0','1.9','1.2.0','1.0.0']);
 });

@@ -13,10 +13,10 @@ function parts(v:string){
  return String(v).replace(/^[^\d]*/,'').split(/[^\d]+/).filter(Boolean).map(n=>Number(n)||0);
 }
 
-/** Newest-first; drops empty labels. */
-export function recentAppVersions<T>(rows:T[],key:(row:T)=>string,limit=5):T[]{
- return [...rows]
+/** Newest-first; drops empty labels. Pass limit to cap how many rows are kept. */
+export function recentAppVersions<T>(rows:T[],key:(row:T)=>string,limit?:number):T[]{
+ const sorted=[...rows]
   .filter(r=>key(r).trim())
-  .sort((a,b)=>compareAppVersions(key(b),key(a)))
-  .slice(0,limit);
+  .sort((a,b)=>compareAppVersions(key(b),key(a)));
+ return limit!=null?sorted.slice(0,limit):sorted;
 }
