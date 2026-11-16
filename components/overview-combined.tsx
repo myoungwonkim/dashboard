@@ -15,8 +15,6 @@ const COLORS={
  spend:'#b85c38',
  ecpi:'#2f6f4e',
  revenue:'#5a5a55',
- play:'#444444',
- asc:'#888888',
 };
 
 function pickParts(map:PartMap,ids:string[]){
@@ -29,8 +27,6 @@ export default function OverviewCombined({apps,days,startDate,endDate,country,os
  const [newByApp,setNewByApp]=useState<PartMap>({});
  const [spendByApp,setSpendByApp]=useState<PartMap>({});
  const [revenueByApp,setRevenueByApp]=useState<PartMap>({});
- const [playByApp,setPlayByApp]=useState<PartMap>({});
- const [ascByApp,setAscByApp]=useState<PartMap>({});
  const [periodNewByApp,setPeriodNewByApp]=useState<Record<string,number>>({});
  const [periodSpendByApp,setPeriodSpendByApp]=useState<Record<string,number>>({});
  const appOpts=useMemo(()=>apps.map(a=>({id:a.id,name:a.name})),[apps]);
@@ -38,14 +34,12 @@ export default function OverviewCombined({apps,days,startDate,endDate,country,os
 
  useEffect(()=>{
   const c=new AbortController();let alive=true;setLoading(true);
-  setActiveByApp({});setNewByApp({});setSpendByApp({});setRevenueByApp({});setPlayByApp({});setAscByApp({});
+  setActiveByApp({});setNewByApp({});setSpendByApp({});setRevenueByApp({});
   setPeriodNewByApp({});setPeriodSpendByApp({});
   (async()=>{
    const ga4Apps=apps.filter(a=>a.ga4PropertyId);
    const admobApps=apps.filter(a=>a.admobAndroidAppId||a.admobIosAppId);
-   const playApps=apps.filter(a=>a.androidPkg);
-   const ascApps=apps.filter(a=>a.appleAppId);
-   const act:PartMap={};const neu:PartMap={};const spd:PartMap={};const rev:PartMap={};const play:PartMap={};const asc:PartMap={};
+   const act:PartMap={};const neu:PartMap={};const spd:PartMap={};const rev:PartMap={};
    const newSum:Record<string,number>={};const spendSum:Record<string,number>={};
    await Promise.all([
     ...ga4Apps.map(async a=>{
@@ -77,23 +71,9 @@ export default function OverviewCombined({apps,days,startDate,endDate,country,os
       if(r.ok&&body.status==='success'&&body.data?.daily)rev[a.id]=body.data.daily.map(d=>({date:d.date,value:d.revenue}));
      }catch{}
     }),
-    ...playApps.map(async a=>{
-     try{
-      const r=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate,endDate}),signal:c.signal});
-      const body=await r.json() as {status:string;data?:{daily?:{date:string;installs:number}[]}};
-      if(r.ok&&body.status==='success'&&body.data?.daily)play[a.id]=body.data.daily.map(d=>({date:d.date,value:d.installs}));
-     }catch{}
-    }),
-    ...ascApps.map(async a=>{
-     try{
-      const r=await fetch('/api/asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days}),signal:c.signal});
-      const body=await r.json() as {status:string;data?:{daily?:{date:string;downloads:number}[]}};
-      if(r.ok&&body.status==='success'&&body.data?.daily)asc[a.id]=body.data.daily.map(d=>({date:d.date,value:d.downloads}));
-     }catch{}
-    }),
    ]);
    if(!alive)return;
-   setActiveByApp(act);setNewByApp(neu);setSpendByApp(spd);setRevenueByApp(rev);setPlayByApp(play);setAscByApp(asc);
+   setActiveByApp(act);setNewByApp(neu);setSpendByApp(spd);setRevenueByApp(rev);
    setPeriodNewByApp(newSum);setPeriodSpendByApp(spendSum);setLoading(false);
   })();
   return ()=>{alive=false;c.abort();};
@@ -118,25 +98,12 @@ export default function OverviewCombined({apps,days,startDate,endDate,country,os
   return points.length?[{name:'광고 수익 합',color:COLORS.revenue,points,format:'usd' as const}]:[];
  },[revenueByApp,selectedIds]);
 
- const storeSeries=useMemo(()=>{
-  const play=sumPointsByDate(pickParts(playByApp,selectedIds));
-  const asc=sumPointsByDate(pickParts(ascByApp,selectedIds));
-  return [
-   ...(play.length?[{name:'Play 설치 합',color:COLORS.play,points:play}]:[]),
-   ...(asc.length?[{name:'ASC 다운로드 합',color:COLORS.asc,points:asc,dashed:true}]:[]),
-  ];
- },[playByApp,ascByApp,selectedIds]);
-
  const periodNewUsers=selectedIds.reduce((s,id)=>s+(periodNewByApp[id]||0),0);
  const periodSpend=selectedIds.reduce((s,id)=>s+(periodSpendByApp[id]||0),0);
  const periodEcpi=cpi(periodSpend,periodNewUsers);
  const multi=selectedIds.length>1;
  const scopeLabel=filter.label;
  const revenueSeriesNamed=useMemo(()=>revenueSeries.map(s=>({...s,name:multi?'광고 수익 합':'광고 수익'})),[revenueSeries,multi]);
- const storeSeriesNamed=useMemo(()=>storeSeries.map(s=>({
-  ...s,
-  name:s.name.includes('Play')?(multi?'Play 설치 합':'Play 설치'):(multi?'ASC 다운로드 합':'ASC 다운로드'),
- })),[storeSeries,multi]);
 
  return <section className="overview-combined" id="section-trends">
   <div className="sectiontitle marketing-title">
@@ -149,7 +116,6 @@ export default function OverviewCombined({apps,days,startDate,endDate,country,os
   <p className="note">{multi?'앱별 수치를 날짜별로 합칩니다. ':''}eCPI = 마케팅 비용 ÷ 신규 사용자(GA4) · 기간 eCPI {periodEcpi==null?'—':'$'+periodEcpi.toFixed(2)} · {scopeLabel} · 블록을 눌러 그래프를 켜고 끌 수 있습니다.</p>
   {!!hero.length&&!loading&&<div className="panel"><div className="sectiontitle"><h2>일별 활성 · 신규 · 비용 · eCPI</h2><span>{scopeLabel}</span></div><TrendChart series={hero} height={220}/></div>}
   {!!revenueSeriesNamed.length&&!loading&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>일별 광고 수익</h2><span>{scopeLabel}</span></div><TrendChart series={revenueSeriesNamed}/></div>}
-  {!!storeSeriesNamed.length&&!loading&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>{scopeLabel}</span></div><TrendChart series={storeSeriesNamed}/></div>}
-  {!loading&&!hero.length&&!revenueSeriesNamed.length&&!storeSeriesNamed.length&&<p className="note">표시할 일별 데이터가 없습니다. 연결 상태를 확인해 주세요.</p>}
+  {!loading&&!hero.length&&!revenueSeriesNamed.length&&<p className="note">표시할 일별 데이터가 없습니다. 연결 상태를 확인해 주세요.</p>}
  </section>;
 }

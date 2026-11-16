@@ -16,7 +16,7 @@ function normalizeBucketInput(raw:string){
 export default function PlaySetup(){
  const [setup,setSetup]=useState<Setup|null>(null),[file,setFile]=useState<File|null>(null),[bucket,setBucket]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('Play 연결 상태 확인 중…');
  const input=useRef<HTMLInputElement>(null);
- async function refresh(){try{const r=await fetch('/api/play/setup',{cache:'no-store'});const v=await r.json() as Setup & {message?:string};if(!r.ok)throw Error(v.message);setSetup(v);setBucket(v.gcsBucket||'');setMessage(v.configured?(v.gcsBucket?'Play 연결·GCS 버킷이 등록되어 있습니다. 아래 스토어 배치를 한 번 실행하면 설치 수가 Overview에 채워집니다.':'Play 서비스 계정은 등록됨. 설치 수를 보려면 GCS 버킷을 추가하고 「버킷만 저장」을 누르세요.'):'Play Console에 초대한 서비스 계정 JSON을 등록하세요.');}catch(e){setMessage(e instanceof Error?e.message:'상태를 불러오지 못했습니다.');}}
+ async function refresh(){try{const r=await fetch('/api/play/setup',{cache:'no-store'});const v=await r.json() as Setup & {message?:string};if(!r.ok)throw Error(v.message);setSetup(v);setBucket(v.gcsBucket||'');setMessage(v.configured?(v.gcsBucket?'Play 연결·GCS 버킷이 등록되어 있습니다. 아래 스토어 배치로 CSV를 적재할 수 있습니다.':'Play 서비스 계정은 등록됨. GCS 버킷을 추가하고 「버킷만 저장」을 누르세요.'):'Play Console에 초대한 서비스 계정 JSON을 등록하세요.');}catch(e){setMessage(e instanceof Error?e.message:'상태를 불러오지 못했습니다.');}}
  useEffect(()=>{void refresh();},[]);
  async function connect(){
   if(!file||!setup||busy)return;setBusy(true);
@@ -68,7 +68,6 @@ export default function PlaySetup(){
     <li>전체 URI를 붙여넣어도 됩니다. 저장 시 <code>gs://</code>와 경로를 자동으로 빼고 버킷 이름만 남깁니다.</li>
     <li>이미 키가 등록돼 있으면 <strong>버킷만 저장</strong> 버튼을 누릅니다. 키를 같이 올릴 때는 JSON 선택 후 <strong>암호화하여 연결</strong>.</li>
     <li>그다음 같은 페이지 아래 <strong>스토어 배치 → 지금 배치 실행</strong></li>
-    <li>Overview로 가서 <strong>새로고침</strong> → Play 설치 열 확인</li>
    </ol>
   </li>
  </ol>

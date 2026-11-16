@@ -10,7 +10,6 @@ import {appColor} from '@/lib/app-colors';
 import AppIcon from './app-icon';
 import GA4Live from './ga4-live';
 import AdmobLive from './admob-live';
-import StoreLive from './store-live';
 import MarketingLive from './marketing-live';
 import OverviewCombined from './overview-combined';
 import ConnectionsPage from './connections-page';
@@ -36,7 +35,6 @@ const tasks=[
 
 type Ga4Row={activeUsers:number;averageDau:number;sessions:number;events:number;newUsers?:number};
 type AdmobRow={revenue:number;impressions:number;clicks:number;ecpm:number;ctr:number;matchRate?:number};
-type StoreRow={playInstalls?:number|null;ascDownloads?:number|null;playSource?:string|null;playNote?:string|null};
 type PlaySetupState={configured:boolean;gcsBucket:string|null;verifiedAt:string|null};
 
 export default function Dashboard({page}:{page:string}){
@@ -51,7 +49,7 @@ export default function Dashboard({page}:{page:string}){
  const [editing,setEditing]=useState<AppRecord|null>(null);
  const [showNotices,setShowNotices]=useState(false);
  const [refreshing,setRefreshing]=useState(false);
- type CompareRow={ga4?:Ga4Row;admob?:AdmobRow;store?:StoreRow;spend?:number;ga4Error?:string;admobError?:string;playError?:string;playCode?:string};
+ type CompareRow={ga4?:Ga4Row;admob?:AdmobRow;spend?:number;ga4Error?:string;admobError?:string};
  const [compare,setCompare]=useState<Record<string,CompareRow>>({});
  useEffect(()=>{
   setAppsError('');
@@ -73,22 +71,20 @@ export default function Dashboard({page}:{page:string}){
  const codeDone=11+Number(ga4Verified);
  const doneBase=codeDone+Number(admobVerified);
  const progressLabel=`진행상황 ${doneBase}/13`;
- const needsSetup=!ga4Verified||!admobVerified||apps.some(a=>!a.androidPkg)||!playSetup?.gcsBucket;
+ const needsSetup=!ga4Verified||!admobVerified;
  const overviewGa4Errors=apps.map(a=>compare[a.id]?.ga4Error?`${a.name}: ${compare[a.id]!.ga4Error}`:'').filter(Boolean);
- const playInstallGap=apps.some(a=>a.androidPkg&&compare[a.id]?.store&&compare[a.id]!.store!.playInstalls==null);
  const compareAppOpts=useMemo(()=>apps.map(a=>({id:a.id,name:a.name})),[apps]);
  const compareFilter=useAppFilter(compareAppOpts);
  const compareApps=useMemo(()=>apps.filter(a=>compareFilter.includes(a.id)),[apps,compareFilter.selected,compareFilter.allOn]);
  const totals=useMemo(()=>{
-  let dau=0,play=0,rev=0,users=0,spend=0,dauN=0,playN=0,revN=0,userN=0,spendN=0;
+  let dau=0,rev=0,users=0,spend=0,dauN=0,revN=0,userN=0,spendN=0;
   for(const a of compareApps){
    const row=compare[a.id];
    if(row?.ga4){dau+=row.ga4.averageDau;dauN++;users+=row.ga4.activeUsers;userN++;}
-   if(row?.store?.playInstalls!=null){play+=row.store.playInstalls;playN++;}
    if(row?.admob){rev+=row.admob.revenue;revN++;}
    if(row?.spend!=null){spend+=row.spend;spendN++;}
   }
-  return {dau,play,rev,users,spend,dauN,playN,revN,userN,spendN,arpu:adArpu(revN&&userN?rev:null,userN?users:null),roas:spend>0&&revN?rev/spend:null};
+  return {dau,rev,users,spend,dauN,revN,userN,spendN,arpu:adArpu(revN&&userN?rev:null,userN?users:null),roas:spend>0&&revN?rev/spend:null};
  },[compareApps,compare]);
  const revenueByApp=useMemo(()=>{
   const out:Record<string,number|undefined>={};
@@ -107,26 +103,12 @@ export default function Dashboard({page}:{page:string}){
   const controller=new AbortController();
   setCompare({});
   Promise.all(scope.map(async a=>{
-   const next:CompareRow={store:{}};
+   const next:CompareRow={};
    if(a.ga4PropertyId){
     try{const res=await fetch('/api/ga4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate,country,os}),signal:controller.signal});const body=await res.json() as {status:string;data?:Ga4Row;message?:string};if(res.ok&&body.status==='success'&&body.data)next.ga4=body.data;else next.ga4Error=body.message||'GA4 조회 실패';}catch{next.ga4Error='GA4 서버 연결 실패';}
    }
    if(a.admobAndroidAppId||a.admobIosAppId){
     try{const res=await fetch('/api/admob',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate,country,os}),signal:controller.signal});const body=await res.json() as {status:string;data?:AdmobRow&{ctr?:number;clicks:number;impressions:number};message?:string};if(res.ok&&body.status==='success'&&body.data)next.admob={...body.data,ctr:body.data.ctr??(body.data.impressions?body.data.clicks/body.data.impressions:0)};else next.admobError=body.message||'AdMob 조회 실패';}catch{next.admobError='AdMob 서버 연결 실패';}
-   }
-   if(a.androidPkg){
-    try{
-     const res=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate}),signal:controller.signal});
-     const body=await res.json() as {status:string;data?:{installs:number|null;installsSource?:string|null;note?:string};message?:string;code?:string};
-     if(res.ok&&body.status==='success'){
-      next.store!.playInstalls=body.data?.installs??null;
-      next.store!.playSource=body.data?.installsSource??null;
-      next.store!.playNote=body.data?.note??null;
-     }else{next.playError=body.message||'Play 조회 실패';next.playCode=body.code;}
-    }catch{next.playError='Play 서버 연결 실패';}
-   }
-   if(a.appleAppId){
-    try{const res=await fetch('/api/asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days}),signal:controller.signal});const body=await res.json() as {status:string;data?:{downloads:number|null}};if(res.ok&&body.status==='success')next.store!.ascDownloads=body.data?.downloads??null;}catch{}
    }
    try{
     const res=await fetch('/api/marketing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate:dateRange.startDate,endDate:dateRange.endDate,revenue:next.admob?.revenue}),signal:controller.signal});
@@ -147,46 +129,19 @@ export default function Dashboard({page}:{page:string}){
   window.location.reload();
  }
 
- function playCell(a:AppRecord,row?:CompareRow){
-  if(!a.androidPkg)return '—';
-  if(row?.playError){
-   const label=row.playCode==='not_configured'||!playSetup?.configured?'키 필요'
-    :row.playCode==='permission_denied'?'권한 필요'
-    :row.playCode==='authentication_failed'?'인증 실패'
-    :!playSetup?.gcsBucket?'버킷·연결 확인'
-    :'연결 오류';
-   return <span className="batchwait" title={row.playError} onClick={e=>e.stopPropagation()}><Link href="/connections">{label}</Link></span>;
-  }
-  if(row?.store?.playInstalls!=null)return row.store.playInstalls.toLocaleString();
-  if(row?.store&&row.store.playInstalls==null){
-   const reason=!playSetup?.configured?'키 필요':!playSetup?.gcsBucket?'버킷 필요':'배치/CSV 대기';
-   return <span className="batchwait" title={row.store.playNote||undefined} onClick={e=>e.stopPropagation()}><Link href="/connections">{reason}</Link></span>;
-  }
-  return '…';
- }
  const compareCols=useMemo(():MetricCol<AppRecord>[]=>[
-  {key:'name',label:'앱',get:a=>a.name,render:a=>{const row=compare[a.id];return <div className="applink"><AppIcon app={a}/><span><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}<small>{a.androidPkg||a.id}{row?.store?.playSource?` · ${row.store.playSource}`:''}{row?.ga4Error?' · GA4 오류':''}</small></span></div>;}},
+  {key:'name',label:'앱',get:a=>a.name,render:a=>{const row=compare[a.id];return <div className="applink"><AppIcon app={a}/><span><span className="appdot" style={{background:appColor(a.id)}} aria-hidden/>{a.name}<small>{a.androidPkg||a.id}{row?.ga4Error?' · GA4 오류':''}</small></span></div>;}},
   {key:'dau',label:'DAU',get:a=>compare[a.id]?.ga4?.averageDau??null,render:a=>{const row=compare[a.id];return row?.ga4?row.ga4.averageDau.toLocaleString():'—';}},
-  {key:'play',label:'Play',get:a=>compare[a.id]?.store?.playInstalls??null,render:a=>playCell(a,compare[a.id])},
-  {key:'asc',label:'ASC',get:a=>compare[a.id]?.store?.ascDownloads??null,render:a=>{const row=compare[a.id];const ascPending=!!a.appleAppId&&!!row?.store&&row.store.ascDownloads==null;return row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():ascPending?<span className="batchwait" onClick={e=>e.stopPropagation()}><Link href="/connections">배치 대기</Link></span>:(a.appleAppId?'—':'iOS 미출시');}},
   {key:'rev',label:'수익',get:a=>compare[a.id]?.admob?.revenue??null,render:a=>{const row=compare[a.id];return row?.admob?'$'+row.admob.revenue.toFixed(2):'—';}},
   {key:'spend',label:'비용',get:a=>compare[a.id]?.spend??null,render:a=>{const row=compare[a.id];return row?.spend!=null?'$'+row.spend.toFixed(2):'—';}},
   {key:'roas',label:'ROAS',get:a=>{const row=compare[a.id];return row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;},render:a=>{const row=compare[a.id];const appRoas=row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;return appRoas!=null?appRoas.toFixed(2)+'x':'—';}},
   {key:'arpu',label:'유저당',get:a=>adArpu(compare[a.id]?.admob?.revenue,compare[a.id]?.ga4?.activeUsers),render:a=>fmtUsd(adArpu(compare[a.id]?.admob?.revenue,compare[a.id]?.ga4?.activeUsers))},
   {key:'ecpm',label:'eCPM',get:a=>compare[a.id]?.admob?.ecpm??null,render:a=>{const row=compare[a.id];return row?.admob?'$'+row.admob.ecpm.toFixed(2):'—';}},
- ],[compare,playSetup]);
- const overviewPlayErrors=apps.map(a=>{
-  const row=compare[a.id];
-  if(!a.androidPkg||!row?.playError)return '';
-  return `${a.name}: ${row.playError}`;
- }).filter(Boolean);
+ ],[compare]);
  const noticeCount=1
   +Number(page==='overview'&&needsSetup&&appsLoaded&&!appsError)
-  +Number(page==='overview'&&playInstallGap&&!needsSetup)
   +Number(os==='ios')
-  +Number(!!overviewGa4Errors.length)
-  +Number(!!overviewPlayErrors.length)
-  +Number(!overviewPlayErrors.length&&page==='overview'&&!!playSetup&&!playSetup.gcsBucket&&!!apps.some(a=>a.androidPkg));
+  +Number(!!overviewGa4Errors.length);
 
  const checklist=[
   {ok:ga4Verified,label:'GA4 서비스 계정 · 속성 조회',href:'#ga4',tab:'ga4' as const},
@@ -205,7 +160,6 @@ export default function Dashboard({page}:{page:string}){
    {id:'section-retention',label:'리텐션'},
    {id:'section-admob',label:'AdMob'},
    {id:'section-marketing',label:'마케팅'},
-   {id:'section-store',label:'스토어'},
   ];
   if(current)return [
    {id:'section-trends',label:'핵심 추세'},
@@ -217,7 +171,6 @@ export default function Dashboard({page}:{page:string}){
    {id:'section-versions',label:'앱 버전'},
    {id:'section-admob',label:'AdMob'},
    {id:'section-marketing',label:'마케팅'},
-   {id:'section-store',label:'스토어'},
   ];
   return [];
  },[page,current?.id]);
@@ -232,12 +185,9 @@ export default function Dashboard({page}:{page:string}){
   </button>
   {showNotices&&<div className="noticefold-body">
    <div className="notice"><span className="dot"/>표시 숫자는 실조회입니다. AppsFlyer Zero는 API 없음.<Link href="/connections">연결 <ArrowUpRight size={13}/></Link></div>
-   {page==='overview'&&needsSetup&&appsLoaded&&!appsError&&<div className="notice setuphint"><span className="dot"/>미연결 항목이 있으면 — 로 나옵니다. Play 설치가 비면 GCS 버킷·배치를 확인하세요. iOS/ASC는 출시 전 생략 가능.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
-   {page==='overview'&&playInstallGap&&!needsSetup&&<div className="notice setuphint" role="status"><span className="dot"/>Play 설치가 아직 비어 있습니다. Connections → GCS 버킷 → 스토어 배치를 실행한 뒤 새로고침하세요.</div>}
+   {page==='overview'&&needsSetup&&appsLoaded&&!appsError&&<div className="notice setuphint"><span className="dot"/>미연결 항목이 있으면 — 로 나옵니다. GA4·AdMob 키와 앱 매핑을 확인하세요.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
    {os==='ios'&&<div className="notice setuphint" role="status"><span className="dot"/>OS 필터가 iOS입니다. iOS 미출시면 수치가 0 또는 — 로 나옵니다. Android 또는 전체 OS로 바꿔 보세요.</div>}
    {!!overviewGa4Errors.length&&<div className="notice setuphint" role="status"><span className="dot"/>GA4 조회 오류 — {overviewGa4Errors.join(' · ')}</div>}
-   {!!overviewPlayErrors.length&&<div className="notice setuphint" role="status"><span className="dot"/>Play 조회 오류 — {overviewPlayErrors.join(' · ')}{!playSetup?.gcsBucket?' · GCS 버킷을 Connections에 등록하세요.':''}<Link href="/connections">연결 <ArrowUpRight size={13}/></Link></div>}
-   {!overviewPlayErrors.length&&page==='overview'&&playSetup&&!playSetup.gcsBucket&&!!apps.some(a=>a.androidPkg)&&<div className="notice setuphint" role="status"><span className="dot"/>Play 설치는 GCS 버킷이 필요합니다. 앱 안 「통계→보고서 내보내기」가 아니라, 홈으로 나간 뒤 <strong>다운로드 보고서(또는 계정 관리→Google Play 앱 보고서)→통계→Cloud Storage URI 복사</strong>로 <code>pubsite_prod_rev_…</code>를 Connections에 넣으세요.<Link href="/connections">데이터 연결 <ArrowUpRight size={13}/></Link></div>}
   </div>}
  </div>
  <div className="filterbar"><DateRangePicker value={dateRange} onChange={setDateRange}/><label>국가<select aria-label="국가" value={country} onChange={e=>setCountry(e.target.value)}>{COUNTRY_OPTIONS.map(o=><option key={o.code} value={o.code}>{o.label}</option>)}</select></label><label>OS<select aria-label="OS" value={os} onChange={e=>setOs(e.target.value)}><option value="all">전체 OS</option><option value="android">Android</option><option value="ios">iOS</option></select></label><span className="range">각 서비스 시간대 기준 · {days}일</span></div>
@@ -246,7 +196,6 @@ export default function Dashboard({page}:{page:string}){
   <div className="sectiontitle marketing-title" id="section-compare"><div className="marketing-title-row"><h2>앱 비교</h2><AppToggle apps={compareAppOpts} allOn={compareFilter.allOn} selected={compareFilter.selected} onSelectAll={compareFilter.selectAll} onToggle={compareFilter.toggle} label="비교 앱"/></div><span>{compareFilter.label} · 행 클릭 시 상세</span></div>
   <div className="metrics overviewkpi" aria-label="핵심 합계">
    <div className="metric"><span>평균 DAU 합</span><strong>{totals.dauN?Math.round(totals.dau).toLocaleString():'—'}</strong><small>GA4 · 앱 {totals.dauN}/{compareApps.length}</small></div>
-   <div className="metric"><span>Play 설치 합</span><strong>{totals.playN?totals.play.toLocaleString():'—'}</strong><small>{playSetup?.gcsBucket?'GCS/배치':'버킷 미등록'} · 앱 {totals.playN}/{compareApps.filter(a=>a.androidPkg).length}</small></div>
    <div className="metric"><span>광고 수익 합</span><strong>{totals.revN?'$'+totals.rev.toFixed(2):'—'}</strong><small>AdMob · 앱 {totals.revN}/{compareApps.length}</small></div>
    <div className="metric"><span>마케팅 비용</span><strong>{totals.spendN?'$'+totals.spend.toFixed(2):'—'}</strong><small>Ads · 수동 · 앱 {totals.spendN}/{compareApps.length}</small></div>
    <div className="metric"><span>ROAS</span><strong>{totals.roas!=null?totals.roas.toFixed(2)+'x':'—'}</strong><small>AdMob÷마케팅 비용</small></div>
@@ -259,8 +208,6 @@ export default function Dashboard({page}:{page:string}){
   const appRoas=row?.spend&&row.spend>0&&row.admob?row.admob.revenue/row.spend:null;
   return <div className="metrics overviewkpi" aria-label="앱 핵심 지표">
    <div className="metric"><span>평균 DAU</span><strong>{row?.ga4?Math.round(row.ga4.averageDau).toLocaleString():'—'}</strong><small>GA4</small></div>
-   <div className="metric"><span>Play 설치</span><strong>{row?.store?.playInstalls!=null?row.store.playInstalls.toLocaleString():'—'}</strong><small>{playSetup?.gcsBucket?'GCS/배치':(current.androidPkg?'버킷 미등록':'Android 미등록')}</small></div>
-   <div className="metric"><span>ASC 다운로드</span><strong>{row?.store?.ascDownloads!=null?row.store.ascDownloads.toLocaleString():'—'}</strong><small>{current.appleAppId?'App Store':'iOS 미출시'}</small></div>
    <div className="metric"><span>광고 수익</span><strong>{row?.admob?'$'+row.admob.revenue.toFixed(2):'—'}</strong><small>AdMob</small></div>
    <div className="metric"><span>마케팅 비용</span><strong>{row?.spend!=null?'$'+row.spend.toFixed(2):'—'}</strong><small>Ads · 수동</small></div>
    <div className="metric"><span>ROAS</span><strong>{appRoas!=null?appRoas.toFixed(2)+'x':'—'}</strong><small>AdMob÷마케팅 비용</small></div>
@@ -279,7 +226,6 @@ export default function Dashboard({page}:{page:string}){
   <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={false}/>
   <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={false}/>
   <MarketingLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} revenueByApp={revenueByApp} newUsersByApp={newUsersByApp} showCharts={false}/>
-  <StoreLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} showCharts={false}/>
  </>}
  {page==='overview'&&!!apps.length&&<p className="note">앱 행을 클릭하면 해당 앱 상세로 이동합니다.</p>}
  </>}
@@ -289,8 +235,7 @@ export default function Dashboard({page}:{page:string}){
   <li>기간을 대시보드와 <strong>동일하게</strong> 맞춥니다 (프리셋 7일 = 어제까지인지 오늘 포함인지 확인).</li>
   <li>GA4: 속성 → 보고서 → 참여도/사용자. OS·국가 필터를 대시보드와 같게.</li>
   <li>AdMob: 앱별 수익·eCPM. 통화 USD, 시차는 AdMob 계정 시간대.</li>
-  <li>Play Console: 통계 → 설치 수(기기). GCS CSV 합계와 ±1일 오차는 수출 지연으로 흔함.</li>
-  <li>차이가 크면 Connections에서 속성 ID·패키지명·버킷을 재확인한 뒤 배치를 다시 실행합니다.</li>
+  <li>차이가 크면 Connections에서 속성 ID·패키지명·AdMob 앱 ID를 재확인합니다.</li>
  </ol>
  <p className="note">「원본 콘솔 수치 대조」가 완료되면 Progress에서 대기로 남아 있어도 실사용에는 문제 없습니다. 수치만 직접 확인하면 됩니다.</p>
  </section>
