@@ -1,6 +1,14 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import type {AppRecord} from '@/lib/apps';
+import {appColor} from '@/lib/app-colors';
+import {meanNums,sumNums} from '@/lib/metric-rollups.mts';
 import TrendChart from './trend-chart';
+import {recentAppVersions} from '@/lib/app-version.mts';
+import MetricTable from './metric-table';
+import AppToggle,{useAppFilter} from './app-toggle';
+function AppMark({id,name}:{id:string;name:string}){
+ return <span className="apptitle"><span className="appdot" style={{background:appColor(id)}} aria-hidden/>{name}</span>;
+}
 type Spike={date:string;value:number;baseline:number;direction:'up'|'down';ratio:number|null};
 type Dim={key:string;installs:number;visitors:number;pageViews:number;conversions:number;ratingAvg:number|null};
 type Perf={visitors:number;acquisitions:number;conversionRate:number|null;daily:{date:string;visitors:number;acquisitions:number;conversionRate:number|null}[]};
@@ -8,30 +16,103 @@ type PlayData={packageName:string;installs:number|null;uninstalls?:number|null;r
 type AscData={appleAppId:string;name:string;bundleId:string;downloads:number|null;reviews?:{id:string;rating:number;title:string;text:string;author:string;at:string|null}[];daily?:{date:string;downloads:number}[];spike?:Spike|null;perf?:Perf|null;note?:string;fetchedAt:string};
 type Result<T>={status:'success';data:T}|{status:'error';message:string;code?:string};
 function SpikeNote({spike}:{spike?:Spike|null}){if(!spike)return null;return <p className="note">급변 {spike.direction==='up'?'↑':'↓'} {spike.date}: {spike.value.toLocaleString()} (최근 평균 {Math.round(spike.baseline).toLocaleString()}{spike.ratio!=null?` · ×${spike.ratio.toFixed(1)}`:''})</p>;}
-function DimTable({title,rows,metric}:{title:string;rows?:Dim[];metric:'installs'|'visitors'}){if(!rows?.length)return null;return <div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>{title}</h2><span>Top</span></div><div className="tablewrap"><table><thead><tr><th>항목</th><th>{metric==='installs'?'설치':'방문'}</th><th>전환</th><th>평점</th></tr></thead><tbody>{rows.map(r=><tr key={r.key}><td>{r.key}</td><td>{(metric==='installs'?r.installs:r.visitors).toLocaleString()}</td><td>{r.conversions?r.conversions.toLocaleString():'—'}</td><td>{r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'}</td></tr>)}</tbody></table></div></div>;}
-export default function StoreLive({apps,app,days}:{apps:AppRecord[];app?:string;days:number}){
+function DimTable({title,rows,metric,recentVersions=false}:{title:string;rows?:Dim[];metric:'installs'|'visitors';recentVersions?:boolean}){
+ if(!rows?.length)return null;
+ const list=recentVersions?recentAppVersions(rows,r=>r.key):rows.slice(0,12);
+ const metricKey=metric==='installs'?'installs':'visitors';
+ return <div className="panel"><div className="sectiontitle"><h2>{title}</h2><span>{recentVersions?'최근 · 5행':'Top'}</span></div>
+  <MetricTable rows={list} rowKey={r=>r.key} wrapClassName={'tablewrap'+(recentVersions?' version-scroll':'')} defaultSort={recentVersions?null:{key:metricKey,dir:'desc'}} columns={[
+   {key:'key',label:'항목',className:'cell-text',get:r=>r.key,render:r=>r.key},
+   {key:metricKey,label:metric==='installs'?'설치':'방문',get:r=>metric==='installs'?r.installs:r.visitors,render:r=>(metric==='installs'?r.installs:r.visitors).toLocaleString()},
+   {key:'conversions',label:'전환',get:r=>r.conversions||null,render:r=>r.conversions?r.conversions.toLocaleString():'—'},
+   {key:'rating',label:'평점',get:r=>r.ratingAvg,render:r=>r.ratingAvg!=null?r.ratingAvg.toFixed(2):'—'},
+  ]}/>
+ </div>;
+}
+export default function StoreLive({apps,app,days,startDate,endDate,showCharts=true}:{apps:AppRecord[];app?:string;days:number;startDate?:string;endDate?:string;showCharts?:boolean}){
  const [play,setPlay]=useState<Record<string,Result<PlayData>>>({});
  const [asc,setAsc]=useState<Record<string,Result<AscData>>>({});
- const [loading,setLoading]=useState(true),[retry,setRetry]=useState(0);
+ const [loading,setLoading]=useState(true);
  const playTargets=apps.filter(a=>a.androidPkg&&(!app||a.id===app));
  const ascTargets=apps.filter(a=>a.appleAppId&&(!app||a.id===app));
  useEffect(()=>{
   const c=new AbortController();let active=true;setLoading(true);setPlay({});setAsc({});
   const tasks:Promise<void>[]=[];
-  for(const a of playTargets)tasks.push((async()=>{let result:Result<PlayData>;try{const r=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days}),signal:c.signal});result=await r.json() as Result<PlayData>;}catch{result={status:'error',message:'Play 서버에 연결하지 못했습니다.'};}if(active)setPlay(p=>({...p,[a.id]:result}));})());
+  for(const a of playTargets)tasks.push((async()=>{let result:Result<PlayData>;try{const r=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days,startDate,endDate}),signal:c.signal});result=await r.json() as Result<PlayData>;}catch{result={status:'error',message:'Play 서버에 연결하지 못했습니다.'};}if(active)setPlay(p=>({...p,[a.id]:result}));})());
   for(const a of ascTargets)tasks.push((async()=>{let result:Result<AscData>;try{const r=await fetch('/api/asc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app:a.id,days}),signal:c.signal});result=await r.json() as Result<AscData>;}catch{result={status:'error',message:'ASC 서버에 연결하지 못했습니다.'};}if(active)setAsc(p=>({...p,[a.id]:result}));})());
   if(!tasks.length){setLoading(false);return ()=>{active=false;c.abort();};}
   Promise.all(tasks).finally(()=>{if(active)setLoading(false);});
   return ()=>{active=false;c.abort();};
- },[app,days,retry,playTargets.map(t=>t.id).join(','),ascTargets.map(t=>t.id).join(',')]);
- const playCharts=playTargets.flatMap(a=>{const r=play[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 설치',color:'#444',points:r.data.daily.map(d=>({date:d.date,value:d.installs}))}];});
- const ascCharts=ascTargets.flatMap(a=>{const r=asc[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 다운로드',color:'#888',dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.downloads}))}];});
- const detailPlay=app?play[app]:undefined;const detailAsc=app?asc[app]:undefined;
- return <section className="ga4live">
-  <div className="sectiontitle"><h2>스토어 · 유입 본선</h2><button className="refresh" disabled={loading} onClick={()=>setRetry(x=>x+1)}>{loading?'조회 중…':'새로고침'}</button></div>
-  <p className="note">Play 설치·ASC 다운로드가 유입 1순위입니다. 미연결 시 가짜 숫자 없이 연결 안내만 표시합니다.</p>
+ },[app,days,startDate,endDate,playTargets.map(t=>t.id).join(','),ascTargets.map(t=>t.id).join(',')]);
+ const storeApps=useMemo(()=>{
+  const map=new Map<string,AppRecord>();
+  for(const a of playTargets)map.set(a.id,a);
+  for(const a of ascTargets)map.set(a.id,a);
+  return [...map.values()];
+ },[playTargets,ascTargets]);
+ const appOpts=useMemo(()=>storeApps.map(a=>({id:a.id,name:a.name})),[storeApps]);
+ const filter=useAppFilter(appOpts);
+ const viewPlay=useMemo(()=>playTargets.filter(a=>filter.includes(a.id)),[playTargets,filter.selected,filter.allOn]);
+ const viewAsc=useMemo(()=>ascTargets.filter(a=>filter.includes(a.id)),[ascTargets,filter.selected,filter.allOn]);
+ const playCharts=viewPlay.flatMap(a=>{const r=play[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' 설치',color:appColor(a.id),points:r.data.daily.map(d=>({date:d.date,value:d.installs}))}];});
+ const ascCharts=viewAsc.flatMap(a=>{const r=asc[a.id];if(!r||r.status!=='success'||!r.data.daily?.length)return [];return [{name:a.name+' iOS',color:appColor(a.id),dashed:true,points:r.data.daily.map(d=>({date:d.date,value:d.downloads}))}];});
+ const detailId=app||filter.soleId||undefined;
+ const detailPlay=detailId?play[detailId]:undefined;const detailAsc=detailId?asc[detailId]:undefined;
+ const playOk=useMemo(()=>viewPlay.map(a=>{const r=play[a.id];return r?.status==='success'?r.data:null;}).filter(Boolean) as PlayData[],[viewPlay,play]);
+ const ascOk=useMemo(()=>viewAsc.map(a=>{const r=asc[a.id];return r?.status==='success'?r.data:null;}).filter(Boolean) as AscData[],[viewAsc,asc]);
+ const overview=!app;
+ const storeTotals=useMemo(()=>{
+  if(!playOk.length&&!ascOk.length)return null;
+  const playInstalls=sumNums(playOk.map(d=>d.installs));
+  const playUninstalls=sumNums(playOk.map(d=>d.uninstalls??null));
+  const ascDownloads=sumNums(ascOk.map(d=>d.downloads));
+  const playVisitors=sumNums(playOk.map(d=>d.perf?.visitors??null));
+  const ascVisitors=sumNums(ascOk.map(d=>d.perf?.visitors??null));
+  return {
+   playInstalls,playUninstalls,ascDownloads,
+   playVisitors,ascVisitors,
+   playConv:meanNums(playOk.map(d=>d.perf?.conversionRate??null)),
+   ascConv:meanNums(ascOk.map(d=>d.perf?.conversionRate??null)),
+   playN:playOk.length,ascN:ascOk.length,
+  };
+ },[playOk,ascOk]);
+ const soleApp=filter.soleId?storeApps.find(a=>a.id===filter.soleId):null;
+ const solePlay=soleApp?play[soleApp.id]:undefined;
+ const soleAsc=soleApp?asc[soleApp.id]:undefined;
+ return <section className="ga4live" id="section-store">
+  <div className="sectiontitle marketing-title"><div className="marketing-title-row"><h2>스토어 · 유입 본선</h2><AppToggle apps={appOpts} allOn={filter.allOn} selected={filter.selected} onSelectAll={filter.selectAll} onToggle={filter.toggle} label="스토어 앱"/></div><span>{loading?'조회 중…':filter.label}</span></div>
+  <p className="note">Play 설치·ASC 다운로드가 유입 1순위입니다. 합산=설치·다운로드 합 · 전환율=앱 평균 · {filter.label}</p>
   <div className="livegrid" aria-live="polite">
-   {playTargets.map(a=>{const r=play[a.id];return <article className="livecard" key={'play-'+a.id}><h3>{a.name} · Play</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
+   {!loading&&overview&&soleApp&&<>
+    {solePlay&&<article className="livecard aggregate"><h3><AppMark id={soleApp.id} name={soleApp.name}/> · Play</h3>{solePlay.status==='error'?<><p>{solePlay.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
+     <div><dt>패키지</dt><dd>{solePlay.data.packageName}</dd></div>
+     <div><dt>설치 (기간)</dt><dd>{solePlay.data.installs==null?<a href="/connections">배치 대기</a>:solePlay.data.installs.toLocaleString()}</dd></div>
+     <div><dt>삭제</dt><dd>{solePlay.data.uninstalls==null?'—':solePlay.data.uninstalls.toLocaleString()}</dd></div>
+     <div><dt>평점</dt><dd>{solePlay.data.ratings?`${solePlay.data.ratings.average.toFixed(2)} (${solePlay.data.ratings.count.toLocaleString()})`:'—'}</dd></div>
+     <div><dt>스토어 방문</dt><dd>{solePlay.data.perf?solePlay.data.perf.visitors.toLocaleString():'—'}</dd></div>
+     <div><dt>전환율</dt><dd>{solePlay.data.perf?.conversionRate!=null?(solePlay.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</dd></div>
+     <div><dt>Crash-free</dt><dd>{solePlay.data.vitals?((solePlay.data.vitals.crashFreeRate)*100).toFixed(2)+'%':'—'}</dd></div>
+    </dl><SpikeNote spike={solePlay.data.spike}/></>}</article>}
+    {soleAsc&&<article className="livecard aggregate"><h3><AppMark id={soleApp.id} name={soleApp.name}/> · App Store</h3>{soleAsc.status==='error'?<><p>{soleAsc.message}</p><a href="/connections">ASC 연결 →</a></>:<><dl>
+     <div><dt>Apple ID</dt><dd>{soleAsc.data.appleAppId}</dd></div>
+     <div><dt>번들</dt><dd>{soleAsc.data.bundleId||'—'}</dd></div>
+     <div><dt>다운로드</dt><dd>{soleAsc.data.downloads==null?'배치 대기':soleAsc.data.downloads.toLocaleString()}</dd></div>
+     <div><dt>노출/방문</dt><dd>{soleAsc.data.perf?soleAsc.data.perf.visitors.toLocaleString():'—'}</dd></div>
+     <div><dt>전환율</dt><dd>{soleAsc.data.perf?.conversionRate!=null?(soleAsc.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</dd></div>
+     <div><dt>최근 리뷰</dt><dd>{(soleAsc.data.reviews?.length||0).toLocaleString()}</dd></div>
+    </dl><SpikeNote spike={soleAsc.data.spike}/></>}</article>}
+    {!solePlay&&!soleAsc&&<article className="livecard"><h3><AppMark id={soleApp.id} name={soleApp.name}/></h3><p className="note">이 앱에 등록된 스토어 ID가 없습니다.</p></article>}
+   </>}
+   {!loading&&overview&&!soleApp&&storeTotals&&<article className="livecard aggregate"><h3>앱 합산 · 평균 <small>Play {storeTotals.playN} · ASC {storeTotals.ascN}</small></h3><dl>{[
+    ['Play 설치 합',storeTotals.playInstalls==null?'—':storeTotals.playInstalls.toLocaleString()],
+    ['Play 삭제 합',storeTotals.playUninstalls==null?'—':storeTotals.playUninstalls.toLocaleString()],
+    ['ASC 다운로드 합',storeTotals.ascDownloads==null?'—':storeTotals.ascDownloads.toLocaleString()],
+    ['Play 방문 합',storeTotals.playVisitors==null?'—':storeTotals.playVisitors.toLocaleString()],
+    ['ASC 노출 합',storeTotals.ascVisitors==null?'—':storeTotals.ascVisitors.toLocaleString()],
+    ['Play 전환율(평균)',storeTotals.playConv==null?'—':(storeTotals.playConv*100).toFixed(1)+'%'],
+    ['ASC 전환율(평균)',storeTotals.ascConv==null?'—':(storeTotals.ascConv*100).toFixed(1)+'%'],
+   ].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><small>설치·다운로드·방문은 합산, 전환율은 앱 단순 평균입니다.</small></article>}
+   {!overview&&viewPlay.map(a=>{const r=play[a.id];return <article className="livecard" key={'play-'+a.id}><h3><AppMark id={a.id} name={a.name}/> · Play</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">Play 연결 →</a></>:<><dl>
     <div><dt>패키지</dt><dd>{r.data.packageName}</dd></div>
     <div><dt>설치 (기간)</dt><dd>{r.data.installs==null?<a href="/connections">배치 대기</a>:r.data.installs.toLocaleString()}</dd></div>
     <div><dt>삭제</dt><dd>{r.data.uninstalls==null?'—':r.data.uninstalls.toLocaleString()}</dd></div>
@@ -40,9 +121,9 @@ export default function StoreLive({apps,app,days}:{apps:AppRecord[];app?:string;
     <div><dt>전환율</dt><dd>{r.data.perf?.conversionRate!=null?(r.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</dd></div>
     <div><dt>Crash-free</dt><dd>{r.data.vitals?((r.data.vitals.crashFreeRate)*100).toFixed(2)+'%':'—'}</dd></div>
    </dl><SpikeNote spike={r.data.spike}/>{r.data.note&&<p className="note">{r.data.note}</p>}<small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</small>
-   {!!r.data.reviews.length&&<div className="tablewrap" style={{marginTop:12}}><table><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td style={{whiteSpace:'normal',textAlign:'left'}}>{v.text||v.author}</td></tr>)}</tbody></table></div>}
+   {!!r.data.reviews.length&&<div className="tablewrap" style={{marginTop:12}}><table className="dense"><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td className="cell-text">{v.text||v.author}</td></tr>)}</tbody></table></div>}
    </>}</article>;})}
-   {ascTargets.map(a=>{const r=asc[a.id];return <article className="livecard" key={'asc-'+a.id}><h3>{a.name} · App Store</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">ASC 연결 →</a></>:<><dl>
+   {!overview&&viewAsc.map(a=>{const r=asc[a.id];return <article className="livecard" key={'asc-'+a.id}><h3><AppMark id={a.id} name={a.name}/> · App Store</h3>{!r?<p>조회 중…</p>:r.status==='error'?<><p>{r.message}</p><a href="/connections">ASC 연결 →</a></>:<><dl>
     <div><dt>Apple ID</dt><dd>{r.data.appleAppId}</dd></div>
     <div><dt>번들</dt><dd>{r.data.bundleId||'—'}</dd></div>
     <div><dt>다운로드</dt><dd>{r.data.downloads==null?'배치 대기':r.data.downloads.toLocaleString()}</dd></div>
@@ -50,16 +131,17 @@ export default function StoreLive({apps,app,days}:{apps:AppRecord[];app?:string;
     <div><dt>전환율</dt><dd>{r.data.perf?.conversionRate!=null?(r.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</dd></div>
     <div><dt>최근 리뷰</dt><dd>{(r.data.reviews?.length||0).toLocaleString()}</dd></div>
    </dl><SpikeNote spike={r.data.spike}/>{r.data.note&&<p className="note">{r.data.note}</p>}<small>조회 {new Date(r.data.fetchedAt).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST</small>
-   {!!r.data.reviews?.length&&<div className="tablewrap" style={{marginTop:12}}><table><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td style={{whiteSpace:'normal',textAlign:'left'}}>{v.title||v.text||v.author}</td></tr>)}</tbody></table></div>}
+   {!!r.data.reviews?.length&&<div className="tablewrap" style={{marginTop:12}}><table className="dense"><thead><tr><th>별</th><th>리뷰</th></tr></thead><tbody>{r.data.reviews.slice(0,5).map(v=><tr key={v.id}><td>{v.rating}</td><td className="cell-text">{v.title||v.text||v.author}</td></tr>)}</tbody></table></div>}
    </>}</article>;})}
    {!playTargets.length&&!ascTargets.length&&<p className="note">스토어 ID(패키지·Apple App ID)가 등록된 앱이 없습니다.</p>}
   </div>
-  {!!([...playCharts,...ascCharts].length)&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>스토어</span></div><TrendChart series={[...playCharts,...ascCharts]}/></div>}
-  {detailPlay?.status==='success'&&!loading&&<>
+  {showCharts&&!!([...playCharts,...ascCharts].length)&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>일별 스토어 유입</h2><span>스토어</span></div><TrendChart series={[...playCharts,...ascCharts]}/></div>}
+  {detailPlay?.status==='success'&&!loading&&!!(detailPlay.data.countries?.length||detailPlay.data.versions?.length||detailPlay.data.traffic?.length)&&<div className={'detail-grid'+(detailPlay.data.countries?.length&&detailPlay.data.versions?.length&&detailPlay.data.traffic?.length?' cols-3':'')} style={{marginTop:20}}>
    <DimTable title="Play 국가별 설치" rows={detailPlay.data.countries} metric="installs"/>
-   <DimTable title="Play 앱 버전" rows={detailPlay.data.versions} metric="installs"/>
+   <DimTable title="Play 앱 버전" rows={detailPlay.data.versions} metric="installs" recentVersions/>
    <DimTable title="Play 트래픽 소스" rows={detailPlay.data.traffic} metric="visitors"/>
-  </>}
-  {detailAsc?.status==='success'&&detailAsc.data.perf&&!loading&&<div className="panel" style={{marginTop:16}}><div className="sectiontitle"><h2>App Store 전환</h2><span>Analytics</span></div><p className="note">노출 {detailAsc.data.perf.visitors.toLocaleString()} · 획득 {detailAsc.data.perf.acquisitions.toLocaleString()} · 전환 {detailAsc.data.perf.conversionRate!=null?(detailAsc.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</p></div>}
+  </div>}
+  {detailAsc?.status==='success'&&detailAsc.data.perf&&!loading&&<div className="panel" style={{marginTop:20}}><div className="sectiontitle"><h2>App Store 전환</h2><span>Analytics</span></div><p className="note">노출 {detailAsc.data.perf.visitors.toLocaleString()} · 획득 {detailAsc.data.perf.acquisitions.toLocaleString()} · 전환 {detailAsc.data.perf.conversionRate!=null?(detailAsc.data.perf.conversionRate*100).toFixed(1)+'%':'—'}</p></div>}
  </section>;
 }
+function targetsName(appId:string|undefined,apps:AppRecord[]){return apps.find(a=>a.id===appId)?.name||appId||'앱';}

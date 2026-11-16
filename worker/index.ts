@@ -13,8 +13,12 @@ import * as playSetup from '../app/api/play/setup/route';
 import * as ascApi from '../app/api/asc/route';
 import * as ascSetup from '../app/api/asc/setup/route';
 import * as storeBatch from '../app/api/store/batch/route';
+import * as marketingApi from '../app/api/marketing/route';
+import * as marketingSetup from '../app/api/marketing/setup/route';
+import * as marketingSync from '../app/api/marketing/sync/route';
+import * as marketingUpload from '../app/api/marketing/upload/route';
 import {runStoreBatch} from '../lib/store-batch.mts';
-const routes:Record<string,Record<string,unknown>>={'/api/ga4':ga4,'/api/ga4/setup':ga4Setup,'/api/admob':admob,'/api/admob/setup':admobSetup,'/api/admob/oauth/start':start,'/api/admob/oauth/return':callback,'/api/apps':appsApi,'/api/play':playApi,'/api/play/setup':playSetup,'/api/asc':ascApi,'/api/asc/setup':ascSetup,'/api/store/batch':storeBatch};
+const routes:Record<string,Record<string,unknown>>={'/api/ga4':ga4,'/api/ga4/setup':ga4Setup,'/api/admob':admob,'/api/admob/setup':admobSetup,'/api/admob/oauth/start':start,'/api/admob/oauth/return':callback,'/api/apps':appsApi,'/api/play':playApi,'/api/play/setup':playSetup,'/api/asc':ascApi,'/api/asc/setup':ascSetup,'/api/store/batch':storeBatch,'/api/marketing':marketingApi,'/api/marketing/setup':marketingSetup,'/api/marketing/sync':marketingSync,'/api/marketing/upload':marketingUpload};
 const PUBLIC_ASSETS=new Set(['/favicon.svg','/favicon.ico']);
 export async function handle(req:Request,env:any):Promise<Response>{
  const url=new URL(req.url),path=url.pathname;
@@ -33,7 +37,8 @@ export async function handle(req:Request,env:any):Promise<Response>{
 // Same-origin form POSTs must retain Origin for CSRF validation.
 // no-referrer turns navigation POST Origin into null (Fetch standard).
 export default {
- async fetch(req:Request,env:any){let response;try{response=await handle(req,env);}catch{response=new Response('서버 설정을 확인해 주세요.',{status:503});}const headers=new Headers(response.headers);headers.set('Cache-Control','private, no-store');headers.set('X-Content-Type-Options','nosniff');headers.set('Strict-Transport-Security','max-age=31536000');headers.set('Referrer-Policy','same-origin');headers.set('X-Frame-Options','DENY');headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self' https://accounts.google.com");return new Response(response.body,{status:response.status,headers});},
+ async fetch(req:Request,env:any){let response;try{response=await handle(req,env);}catch{response=new Response('서버 설정을 확인해 주세요.',{status:503});}const headers=new Headers(response.headers);headers.set('Cache-Control','private, no-store');headers.set('X-Content-Type-Options','nosniff');headers.set('Strict-Transport-Security','max-age=31536000');headers.set('Referrer-Policy','same-origin');headers.set('X-Frame-Options','DENY');// Store artwork (Play / App Store) must be allowlisted; img-src 'self' alone breaks icons.
+ headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://play-lh.googleusercontent.com https://*.mzstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self' https://accounts.google.com");return new Response(response.body,{status:response.status,headers});},
  async scheduled(_event:ScheduledEvent,env:any,ctx:ExecutionContext){
   ctx.waitUntil(withGA4(env,()=>runStoreBatch()).catch(()=>null));
  },

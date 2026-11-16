@@ -1,6 +1,6 @@
 import {getCurrentUser} from '@/worker/identity';
 import {validateAppInput} from '@/lib/apps.ts';
-import {createApp,ensureSeedApps,getApp,listApps,updateApp} from '@/lib/apps-store.mts';
+import {createApp,ensureSeedApps,getApp,listApps,refreshAppIcons,updateApp} from '@/lib/apps-store.mts';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie','X-Content-Type-Options':'nosniff'}});
 const messages:Record<string,string>={
@@ -23,13 +23,21 @@ export async function GET(req:Request){
   await ensureSeedApps();
   const url=new URL(req.url);
   const includeArchived=url.searchParams.get('all')==='1';
+  const refreshIcons=url.searchParams.get('icons')==='1'||url.searchParams.get('icons')==='force';
+  const forceIcons=url.searchParams.get('icons')==='force';
   const id=url.searchParams.get('id');
   if(id){
-   const app=await getApp(id);
+   let app=await getApp(id);
    if(!app||(app.status==='archived'&&!includeArchived))return json({message:messages.not_found},404);
+   if(refreshIcons){await refreshAppIcons([app],{force:forceIcons});app=await getApp(id)||app;}
    return json({status:'success',app});
   }
-  return json({status:'success',apps:await listApps({includeArchived})});
+  let apps=await listApps({includeArchived});
+  // Soft-refresh missing/stale store icons on list (Play listing / iTunes).
+  if(refreshIcons||apps.some(a=>!a.iconUrl&&(a.androidPkg||a.appleAppId))){
+   try{await refreshAppIcons(apps,{force:forceIcons});apps=await listApps({includeArchived});}catch{/* keep list without icons */}
+  }
+  return json({status:'success',apps});
  }catch{return json({message:'앱 목록을 불러오지 못했습니다.'},502);}
 }
 

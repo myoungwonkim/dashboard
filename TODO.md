@@ -22,6 +22,10 @@
 - [x] Play GCS 설치·평점 CSV / ASC Sales Report 일 배치→D1 + cron
 - [x] Play 국가·버전·트래픽·store_performance / ASC Analytics ONGOING / 급변 배지 (P3)
 - [x] Overview/Connections 빈 상태·앱 수정·Progress 코드완료 표시
+- [x] Overview KPI 단순화(핵심/확장)·상세 접기·Play 날짜범위 정렬
+- [x] Connections 필수 체크·Play 3단계·Progress 콘솔 대조 안내
+- [x] 앱별 고정 색·차트 점선 규칙·일/주/월 집계·파비콘 미니차트
+- [x] Play GCS UTF-16/gzip 복호화·권한 오류 표면화·스토어 앱 아이콘
 - [ ] AppsFlyer API 연동 (무료 Zero — API 제외, ID 메타만)
 - [ ] P4: 정산·Crashlytics BQ·알림 채널 (선택)
 

@@ -43,7 +43,7 @@ npm run keys
 
 1. GA4: 서비스 계정 JSON을 업로드하고 등록 앱 속성 조회 성공을 확인합니다.
 2. Google OAuth 웹 클라이언트에 아래 승인된 리디렉션 URI를 추가한 뒤 AdMob OAuth JSON을 업로드하고 보고서 읽기를 승인합니다.
-3. Play: Console에 서비스 계정 초대 + (선택) GCS 리포트 버킷 이름을 Connections에 등록합니다.
+3. Play: Console에 서비스 계정 초대 + GCS 버킷 이름 등록. 버킷은 **계정 관리 → Google Play 앱 보고서 → 통계 → Cloud Storage URI 복사**에서 `pubsite_prod_rev_…`만 가져와 Connections에 넣습니다.
 4. App Store Connect: API Key(.p8)·Issuer ID·Key ID·(선택) Vendor Number를 등록합니다. Analytics ONGOING은 첫 리포트까지 하루 이상 걸릴 수 있습니다.
 5. Connections에서 **스토어 배치**를 실행하거나 cron(UTC 21:00)을 기다립니다.
 

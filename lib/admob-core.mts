@@ -47,6 +47,12 @@ export function formatReportBody(q:AdmobQuery,timeZone:string,inventory?:AdmobIn
  if(q.country!=='all')dimensionFilters.push({dimension:'COUNTRY',matchesAny:{values:[q.country]}});
  return {reportSpec:{dateRange:dateRange(q,timeZone,now),dimensions:['FORMAT'],metrics:['ESTIMATED_EARNINGS','IMPRESSIONS','CLICKS','AD_REQUESTS','MATCHED_REQUESTS'],dimensionFilters,localizationSettings:{currencyCode:'USD',languageCode:'en-US'},maxReportRows:1000}};
 }
+export function adUnitReportBody(q:AdmobQuery,timeZone:string,inventory?:AdmobInventory[],now=new Date()){
+ const rows=inventoryRows(q,inventory);
+ const dimensionFilters=[{dimension:'APP',matchesAny:{values:rows.map(a=>a.appId)}}];
+ if(q.country!=='all')dimensionFilters.push({dimension:'COUNTRY',matchesAny:{values:[q.country]}});
+ return {reportSpec:{dateRange:dateRange(q,timeZone,now),dimensions:['AD_UNIT','FORMAT'],metrics:['ESTIMATED_EARNINGS','IMPRESSIONS','CLICKS','AD_REQUESTS','MATCHED_REQUESTS'],dimensionFilters,localizationSettings:{currencyCode:'USD',languageCode:'en-US'},maxReportRows:5000}};
+}
 const num=(v:unknown)=>{if(typeof v!=='string'&&typeof v!=='number')throw Error('invalid_response');if(!/^\d+$/.test(String(v))||!Number.isSafeInteger(Number(v)))throw Error('invalid_response');return Number(v);};
 export function parseAdmobReport(value:unknown,q:AdmobQuery,inventory?:AdmobInventory[]){
  if(!Array.isArray(value)||!value[0]?.header||!value.at(-1)?.footer)throw Error('invalid_response');
@@ -80,6 +86,75 @@ export function parseFormatReport(value:unknown){
  formats.sort((a,b)=>b.revenue-a.revenue);
  return formats;
 }
+export type AdUnitRow={adUnitId:string;name:string;format:string;formatLabel:string;revenue:number;impressions:number;clicks:number;adRequests:number;matchedRequests:number;ecpm:number;ctr:number};
+const FORMAT_LABELS:Record<string,string>={
+ banner:'배너',BANNER:'배너',
+ interstitial:'전면',INTERSTITIAL:'전면',
+ rewarded:'보상형',REWARDED:'보상형',
+ rewarded_interstitial:'보상형 전면',REWARDED_INTERSTITIAL:'보상형 전면',
+ native:'네이티브',NATIVE:'네이티브',
+ app_open:'앱 오픈',APP_OPEN:'앱 오픈',
+ banner_interstitial:'배너/전면(레거시)',BANNER_INTERSTITIAL:'배너/전면(레거시)',
+};
+export function formatLabel(format:string){
+ if(!format||format==='—')return '—';
+ return FORMAT_LABELS[format]||FORMAT_LABELS[format.toUpperCase()]||format;
+}
+function dimValue(dim:unknown):{value:string;label:string|null}{
+ const v=dim as {value?:unknown;displayLabel?:unknown}|undefined;
+ if(typeof v?.value!=='string'||!v.value)return {value:'',label:null};
+ const label=typeof v.displayLabel==='string'&&v.displayLabel.trim()?v.displayLabel.trim():null;
+ return {value:v.value,label};
+}
+export function parseAdUnitReport(value:unknown){
+ if(!Array.isArray(value)||!value[0]?.header||!value.at(-1)?.footer)throw Error('invalid_response');
+ if(value[0].header.localizationSettings?.currencyCode!=='USD')throw Error('invalid_response');
+ const byKey=new Map<string,AdUnitRow>();
+ for(const entry of value.slice(1,-1)){
+  const r=entry.row;if(!r)throw Error('invalid_response');
+  const unit=dimValue(r.dimensionValues?.AD_UNIT);
+  if(!unit.value)throw Error('invalid_response');
+  const fmt=dimValue(r.dimensionValues?.FORMAT);
+  const format=fmt.value||'—';
+  const m=r.metricValues||{},earned=num(m.ESTIMATED_EARNINGS?.microsValue)/1e6,imp=num(m.IMPRESSIONS?.integerValue),clk=num(m.CLICKS?.integerValue),req=num(m.AD_REQUESTS?.integerValue??'0'),matched=num(m.MATCHED_REQUESTS?.integerValue??'0');
+  const key=`${unit.value}\0${format}`;
+  const prev=byKey.get(key);
+  if(prev){
+   prev.revenue+=earned;prev.impressions+=imp;prev.clicks+=clk;prev.adRequests+=req;prev.matchedRequests+=matched;
+   prev.ecpm=prev.impressions?prev.revenue/prev.impressions*1000:0;prev.ctr=prev.impressions?prev.clicks/prev.impressions:0;
+   if(unit.label&&prev.name===prev.adUnitId)prev.name=unit.label;
+  }else byKey.set(key,{adUnitId:unit.value,name:unit.label||unit.value,format,formatLabel:formatLabel(format),revenue:earned,impressions:imp,clicks:clk,adRequests:req,matchedRequests:matched,ecpm:imp?earned/imp*1000:0,ctr:imp?clk/imp:0});
+ }
+ return [...byKey.values()].sort((a,b)=>b.revenue-a.revenue);
+}
+/** Soft-fail map of ad unit id → display name (needs admob.readonly; report displayLabel is preferred). */
+export async function fetchAdUnitNames(token:string,fetcher:typeof fetch=fetch){
+ const names=new Map<string,string>();
+ try{
+  let pageToken='';
+  for(let i=0;i<10;i++){
+   const url=new URL(`https://admob.googleapis.com/v1/accounts/${admobPublisherId}/adUnits`);
+   url.searchParams.set('pageSize','1000');
+   if(pageToken)url.searchParams.set('pageToken',pageToken);
+   const res=await fetcher(url.toString(),{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(15000)});
+   if(!res.ok)break;
+   const body=await res.json() as {adUnits?:{adUnitId?:string;displayName?:string;adFormat?:string}[];nextPageToken?:string};
+   for(const u of body.adUnits||[]){
+    if(typeof u.adUnitId==='string'&&u.adUnitId&&typeof u.displayName==='string'&&u.displayName)names.set(u.adUnitId,u.displayName);
+   }
+   if(!body.nextPageToken)break;
+   pageToken=body.nextPageToken;
+  }
+ }catch{/* soft-fail */}
+ return names;
+}
+export function applyAdUnitNames(units:AdUnitRow[],names:Map<string,string>){
+ return units.map(u=>{
+  const named=names.get(u.adUnitId);
+  if(named&&(u.name===u.adUnitId||!u.name))return {...u,name:named};
+  return u;
+ });
+}
 export async function fetchAdmobReport(q:AdmobQuery,token:string,inventory?:AdmobInventory[],fetcher:typeof fetch=fetch){
  const account=await fetchAdmobAccount(token,fetcher);
  const body=reportBody(q,account.reportingTimeZone!,inventory);
@@ -91,5 +166,12 @@ export async function fetchAdmobReport(q:AdmobQuery,token:string,inventory?:Admo
   const formatResponse=await checked(await fetcher(`https://admob.googleapis.com/v1/accounts/${admobPublisherId}/networkReport:generate`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(formatBody),signal:AbortSignal.timeout(25000)}));
   formats=parseFormatReport(formatResponse);
  }catch{formats=[];}
- return {...parsed,formats,timeZone:account.reportingTimeZone,fetchedAt:new Date().toISOString()};
+ let adUnits:AdUnitRow[]=[];
+ try{
+  const unitBody=adUnitReportBody(q,account.reportingTimeZone!,inventory);
+  const unitResponse=await checked(await fetcher(`https://admob.googleapis.com/v1/accounts/${admobPublisherId}/networkReport:generate`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(unitBody),signal:AbortSignal.timeout(25000)}));
+  adUnits=parseAdUnitReport(unitResponse);
+  adUnits=applyAdUnitNames(adUnits,await fetchAdUnitNames(token,fetcher));
+ }catch{adUnits=[];}
+ return {...parsed,formats,adUnits,timeZone:account.reportingTimeZone,fetchedAt:new Date().toISOString()};
 }

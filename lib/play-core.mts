@@ -125,16 +125,21 @@ export async function fetchPlayAcquisitionInstalls(packageName:string,token:stri
 }
 export async function fetchPlayReport(packageName:string,token:string,fetcher:typeof fetch=fetch){
  if(!packageName||!/^[a-zA-Z][\w.]*$/.test(packageName))throw new PlayError('invalid_query',400);
- const reviewsRes=await fetcher(`https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}/reviews?maxResults=20`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(15000)});
+ // Reviews are optional. A 403 here used to abort the whole /api/play call and hide GCS installs.
  let reviews:{id:string;author:string;rating:number;text:string;at:string|null}[]=[];
- if(reviewsRes.ok){try{reviews=parseReviews(await reviewsRes.json());}catch{reviews=[];}}
- else if(reviewsRes.status===401)throw new PlayError('authentication_failed');
- else if(reviewsRes.status===403)throw new PlayError('permission_denied');
+ let reviewsNote='';
+ try{
+  const reviewsRes=await fetcher(`https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}/reviews?maxResults=20`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(15000)});
+  if(reviewsRes.ok){try{reviews=parseReviews(await reviewsRes.json());}catch{reviews=[];}}
+  else if(reviewsRes.status===401)reviewsNote='리뷰 API 인증 실패(설치 CSV는 계속 조회).';
+  else if(reviewsRes.status===403)reviewsNote='리뷰 API 권한 없음(설치 CSV는 계속 조회). Android Publisher API·리뷰 권한이 필요할 수 있습니다.';
+ }catch{reviewsNote='리뷰 조회를 건너뛰었습니다.';}
  // Vitals (crash/ANR) via Developer Reporting API — soft-fail if not enabled.
  let vitals:{crashRate:number;anrRate:number;crashFreeRate:number}|null=null;
  try{
   const vitalsRes=await fetcher(`https://playdeveloperreporting.googleapis.com/v1beta1/apps/${encodeURIComponent(packageName)}/crashRateMetricSet:query`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({timelineSpec:{aggregationPeriod:'THIRTY_DAYS',startTime:{year:2020,month:1,day:1},endTime:{year:2099,month:1,day:1}},metrics:['crashRate','userPerceivedAnrRate']}),signal:AbortSignal.timeout(15000)});
   if(vitalsRes.ok)vitals=parseVitals(await vitalsRes.json());
  }catch{vitals=null;}
- return {packageName,installs:null as number|null,daily:[] as {date:string;installs:number}[],reviews,vitals,ratings:null as {average:number;count:number}|null,source:'live',limited:!vitals,fetchedAt:new Date().toISOString(),note:'설치 수는 Reporting API에 없어 GCS CSV·배치가 필요합니다. 리뷰·바이탈은 실시간입니다.'};
+ const note=['설치 수는 GCS CSV·배치가 필요합니다. 리뷰·바이탈은 가능할 때만 표시합니다.',reviewsNote].filter(Boolean).join(' ');
+ return {packageName,installs:null as number|null,daily:[] as {date:string;installs:number}[],reviews,vitals,ratings:null as {average:number;count:number}|null,source:'live',limited:!vitals,fetchedAt:new Date().toISOString(),note};
 }

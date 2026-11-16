@@ -7,7 +7,7 @@ import {validatePlayAccount,playAccessToken} from './play-core.mts';
 import {fetchPlayCsvMetrics,type DimRow,type PerfDay} from './play-gcs.mts';
 import {validateAscAccount,ascJwt,fetchAscSalesUnits,fetchAscApp} from './asc-core.mts';
 import {fetchAnalyticsForApp} from './asc-analytics.mts';
-import {ensureSeedApps,listApps} from './apps-store.mts';
+import {ensureSeedApps,listApps,refreshAppIcons} from './apps-store.mts';
 import {spikeFlag} from './spike.mts';
 
 export type BatchResult={id:string;status:'ok'|'partial'|'error';detail:Record<string,unknown>;startedAt:string;finishedAt:string};
@@ -119,6 +119,10 @@ export async function runStoreBatch():Promise<BatchResult>{
   await ensureSeedApps();
   const apps=await listApps();
   const config=envelopeConfig();
+  try{
+   const icons=await refreshAppIcons(apps,{force:false});
+   detail.icons=icons.map(a=>({app:a.id,source:a.iconSource}));
+  }catch(e){detail.iconsError=e instanceof Error?e.message:'icons_failed';}
 
   const playRow=await db.select().from(playConnection).get();
   if(playRow?.gcsBucket){

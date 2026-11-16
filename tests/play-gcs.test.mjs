@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseInstallOverviewCsv,parseRatingsOverviewCsv,parseDimCsv,parseStorePerfOverviewCsv,playStatsObjectName,playPerfObjectName,yearMonthsAround,decodeMaybeUtf16,parseReviewsHistoryCsv} from '../lib/play-gcs.mts';
+import {parseInstallOverviewCsv,parseRatingsOverviewCsv,parseDimCsv,parseStorePerfOverviewCsv,playStatsObjectName,playPerfObjectName,yearMonthsAround,yearMonthsForRange,decodeMaybeUtf16,decodePlayCsvBytes,parseReviewsHistoryCsv} from '../lib/play-gcs.mts';
 
 test('install overview csv captures uninstalls and upgrades',()=>{
  const csv=`Date,Package Name,Daily Device Installs,Daily Device Uninstalls,Daily Device Upgrades
@@ -48,4 +48,19 @@ test('utf-16 reviews history decode and parse',()=>{
  assert.ok(decodeMaybeUtf16(encoded.buffer).includes('Nice'));
  const rows=parseReviewsHistoryCsv(csv,'com.nolsoopgames.bazi');
  assert.equal(rows[0].rating,5);
+});
+
+test('Play install CSV survives UTF-16LE decode (Console export format)',async()=>{
+ const csv=`Date,Package Name,Daily Device Installs\n2026-11-01,com.nolsoopgames.bazi,10\n`;
+ const utf16=new Uint8Array(2+csv.length*2);
+ utf16[0]=0xFF;utf16[1]=0xFE;
+ for(let i=0;i<csv.length;i++){utf16[2+i*2]=csv.charCodeAt(i);utf16[3+i*2]=0;}
+ const text=await decodePlayCsvBytes(utf16.buffer);
+ const rows=parseInstallOverviewCsv(text,'com.nolsoopgames.bazi');
+ assert.equal(rows[0].installs,10);
+});
+
+test('yearMonthsForRange covers window plus prior month',()=>{
+ assert.deepEqual(yearMonthsForRange('20261101','20261114'),['202611','202610']);
+ assert.deepEqual(yearMonthsForRange('20261015','20261202'),['202612','202611','202610','202609']);
 });

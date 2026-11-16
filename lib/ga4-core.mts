@@ -1,6 +1,7 @@
 import {queryDates} from './date-range.mts';
 import {SLUG_RE} from './apps.ts';
 import {isCountryFilter} from './countries.mts';
+import {fetchCohortRetention,type RetentionData} from './ga4-cohort.mts';
 /** @deprecated Kept for tests/fixtures; live lookups use the apps registry. */
 export const properties = {bazi:'550050295',sudoku:'558243778'} as const;
 export type Query={app:string,days:number,startDate?:string,endDate?:string,country:string,os:string};
@@ -43,8 +44,8 @@ export function reportsBody(q:Query){
  return {requests:[
   ...core,
   {...base,dimensions:[{name:'firstUserSource'},{name:'firstUserMedium'}],metrics:[{name:'newUsers'}],orderBys:[{metric:{metricName:'newUsers'},desc:true}],limit:'10',keepEmptyRows:false},
-  {...base,dimensions:[{name:'country'}],metrics:[{name:'activeUsers'},{name:'newUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'10',keepEmptyRows:false},
-  {...base,dimensions:[{name:'appVersion'}],metrics:[{name:'activeUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'10',keepEmptyRows:false},
+  {...base,dimensions:[{name:'countryId'},{name:'country'}],metrics:[{name:'activeUsers'},{name:'newUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'250',keepEmptyRows:false},
+  {...base,dimensions:[{name:'appVersion'}],metrics:[{name:'activeUsers'}],orderBys:[{metric:{metricName:'activeUsers'},desc:true}],limit:'50',keepEmptyRows:false},
  ]};
 }
 export function crashBody(q:Query){
@@ -130,7 +131,15 @@ export function parseReports(body:{reports?:Report[]},q:Query,propertyId:string,
   crashAffectedUsers,crashFreeUsersRate,
   daily:dailyRows,
   firstUser:deep?mapRows(firstUser?.rows,row=>({source:dim(row,0),medium:dim(row,1),newUsers:metric(row,0)})):[],
-  countries:deep?mapRows(country?.rows,row=>({country:dim(row,0),activeUsers:metric(row,0),newUsers:metric(row,1)})):[],
+  countries:deep?mapRows(country?.rows,row=>{
+   const headers=country?.dimensionHeaders?.map(d=>d.name)||[];
+   if(headers[0]==='countryId'){
+    const id=dim(row,0).toUpperCase();
+    if(!/^[A-Z]{2}$/.test(id))return null;
+    return {countryId:id,country:dim(row,1),activeUsers:metric(row,0),newUsers:metric(row,1)};
+   }
+   return {countryId:'',country:dim(row,0),activeUsers:metric(row,0),newUsers:metric(row,1)};
+  }):[],
   versions:deep?mapRows(version?.rows,row=>({version:dim(row,0),activeUsers:metric(row,0)})):[],
   timeZone:timezone,
   limited:limited(total,daily,...(deep?[firstUser!,country!,version!].filter(Boolean) as Report[]:[]),...(crashReport?[crashReport]:[])),
@@ -162,14 +171,15 @@ export async function fetchReport(q:Query,token:string,propertyIdOrFetcher?:stri
  // Prefer deep → core → minimal. Retry on transport OR parse (invalid_response) failures.
  const attempts=[reportsBody(q),coreReportsBody(q),minimalReportsBody(q)];
  let last:unknown;
+ let base:Awaited<ReturnType<typeof parseOrThrow>>|null=null;
  for(let i=0;i<attempts.length;i++){
   try{
    const main=await load(attempts[i]);
    // Deep payload may parse-fail; try slicing to core reports before next network call.
-   try{return await parseOrThrow(main,crash);}
+   try{base=await parseOrThrow(main,crash);break;}
    catch(parseError){
     if(i===0&&(main.reports?.length||0)>=2){
-     try{return await parseOrThrow({reports:main.reports!.slice(0,2)},crash);}catch{/* continue */}
+     try{base=await parseOrThrow({reports:main.reports!.slice(0,2)},crash);break;}catch{/* continue */}
     }
     throw parseError;
    }
@@ -178,7 +188,14 @@ export async function fetchReport(q:Query,token:string,propertyIdOrFetcher?:stri
    if(isHardAuthError(error))throw error;
   }
  }
- throw last instanceof GAError?last:new GAError('invalid_response');
+ if(!base)throw last instanceof GAError?last:new GAError('invalid_response');
+ // Daily cohort retention — soft-fail so main KPIs still return.
+ let retention:RetentionData|null=null;let retentionNote:string|null=null;
+ try{
+  const cohort=await fetchCohortRetention(id,token,q,run);
+  retention=cohort.retention;retentionNote=cohort.note;
+ }catch{retention=null;retentionNote='리텐션을 불러오지 못했습니다.';}
+ return {...base,retention,retentionNote};
 }
 
 export type PropertyCheck={app:string;propertyId:string;ok:boolean;code:string};
