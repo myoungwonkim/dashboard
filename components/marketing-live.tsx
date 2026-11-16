@@ -49,12 +49,13 @@ function channelLabel(selected:Set<MarketingSource>){
  return SOURCE_CHANNELS.filter(c=>selected.has(c.id)).map(c=>c.label).join(' · ');
 }
 
-export default function MarketingLive({apps,app,days,startDate,endDate,revenueByApp,newUsersByApp,showCharts=true}:{apps:AppRecord[];app?:string;days:number;startDate:string;endDate:string;revenueByApp?:Record<string,number|undefined>;newUsersByApp?:Record<string,number|undefined>;showCharts?:boolean}){
+export default function MarketingLive({apps,app,days,startDate,endDate,revenueByApp,newUsersByApp,showCharts=true,onLoadingChange}:{apps:AppRecord[];app?:string;days:number;startDate:string;endDate:string;revenueByApp?:Record<string,number|undefined>;newUsersByApp?:Record<string,number|undefined>;showCharts?:boolean;onLoadingChange?:(loading:boolean)=>void}){
  const [results,setResults]=useState<Record<string,Result>>({});
  const [fetchedNewUsers,setFetchedNewUsers]=useState<Record<string,number>>({});
  const [loading,setLoading]=useState(true);
  const [selected,setSelected]=useState<Set<MarketingSource>>(()=>new Set(ALL_SOURCES));
  const targets=apps.filter(a=>!app||a.id===app);
+ useEffect(()=>{onLoadingChange?.(loading);return ()=>onLoadingChange?.(false);},[loading,onLoadingChange]);
  useEffect(()=>{
   const controller=new AbortController();let active=true;setLoading(true);setResults({});setFetchedNewUsers({});
   if(!targets.length){setLoading(false);return ()=>{active=false;controller.abort();};}

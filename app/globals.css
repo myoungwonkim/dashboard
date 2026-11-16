@@ -276,3 +276,11 @@ table.dense td.cell-text,table.dense th.cell-text,.cell-text{text-align:left;whi
 .fieldhelp-link{display:inline-block;margin-top:12px;font-size:12px;font-weight:500;color:#222;text-decoration:underline;text-underline-offset:2px}
 .fieldhelp-link:hover{color:#000}
 .form .labeltext,.filelabel .labeltext{font-size:inherit;color:inherit}
+
+/* Centered hourglass while report data loads */
+.loading-hourglass{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:24px;background:#ffffff66}
+.loading-hourglass-card{pointer-events:none;display:inline-flex;align-items:center;gap:12px;padding:14px 18px;border:1px solid #e4e4e0;border-radius:12px;background:#fffc;box-shadow:0 10px 28px #00000014;color:#333}
+.loading-hourglass-icon{display:inline-flex;color:#444;animation:hourglass-flip 1.6s ease-in-out infinite}
+.loading-hourglass-label{font-size:13px;font-weight:500;letter-spacing:-0.01em;color:#444;white-space:nowrap}
+@keyframes hourglass-flip{0%{transform:rotate(0deg)}40%{transform:rotate(0deg)}50%{transform:rotate(180deg)}90%{transform:rotate(180deg)}100%{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.loading-hourglass-icon{animation:none}}

@@ -1,7 +1,7 @@
 import DateRangePicker from './date-range-picker';
 import {presetRange,validateRange} from '@/lib/date-range.mts';
 import {COUNTRY_OPTIONS} from '@/lib/countries.mts';
-import {useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useState} from 'react';
 import Link from '@/client/navigation';
 import {useRouter} from '@/client/navigation';
 import {ArrowUpRight,Check,ChevronDown,ChevronRight,RefreshCw} from 'lucide-react';
@@ -17,6 +17,7 @@ import PagePicker from './page-picker';
 import MetricTable,{type MetricCol} from './metric-table';
 import SectionJumps,{type SectionJump} from './section-jumps';
 import AppToggle,{useAppFilter} from './app-toggle';
+import LoadingHourglass,{useBusyFlags} from './loading-hourglass';
 import {adArpu,fmtUsd} from '@/lib/arpu.mts';
 const tasks=[
 ['화면 구조와 디자인 확정','완료','B 앱 비교형 메인 / C 서비스별 분석형 앱 상세. 흑백·회색 중심.'],
@@ -49,16 +50,23 @@ export default function Dashboard({page}:{page:string}){
  const [editing,setEditing]=useState<AppRecord|null>(null);
  const [showNotices,setShowNotices]=useState(false);
  const [refreshing,setRefreshing]=useState(false);
+ const {busy,setBusy}=useBusyFlags();
+ const markCompare=useCallback((v:boolean)=>setBusy('compare',v),[setBusy]);
+ const markTrends=useCallback((v:boolean)=>setBusy('trends',v),[setBusy]);
+ const markGa4=useCallback((v:boolean)=>setBusy('ga4',v),[setBusy]);
+ const markAdmob=useCallback((v:boolean)=>setBusy('admob',v),[setBusy]);
+ const markMarketing=useCallback((v:boolean)=>setBusy('marketing',v),[setBusy]);
  type CompareRow={ga4?:Ga4Row;admob?:AdmobRow;spend?:number;ga4Error?:string;admobError?:string};
  const [compare,setCompare]=useState<Record<string,CompareRow>>({});
  useEffect(()=>{
   setAppsError('');
+  setBusy('apps',true);
   fetch('/api/apps',{cache:'no-store'}).then(async r=>{
    if(!r.ok){setAppsError(r.status===401?'로그인이 필요합니다.':'앱 목록을 불러오지 못했습니다.');setApps([]);return;}
    const v=await r.json() as {apps?:AppRecord[];message?:string};
    setApps(v.apps||[]);
-  }).catch(()=>{setAppsError('앱 목록을 불러오지 못했습니다.');setApps([]);}).finally(()=>setAppsLoaded(true));
- },[appsRetry]);
+  }).catch(()=>{setAppsError('앱 목록을 불러오지 못했습니다.');setApps([]);}).finally(()=>{setAppsLoaded(true);setBusy('apps',false);});
+ },[appsRetry,setBusy]);
  useEffect(()=>{fetch('/api/admob/setup',{cache:'no-store'}).then(async r=>{if(r.ok){const v=await r.json() as {verifiedAt:string|null};setAdmobVerified(!!v.verifiedAt);}}).catch(()=>{});},[]);
  useEffect(()=>{fetch('/api/ga4/setup',{cache:'no-store'}).then(async r=>{if(!r.ok)return;const v=await r.json() as {configured:boolean,checks?:{ok:boolean}[]};setGa4Verified(!!v.checks?.some(c=>c.ok));}).catch(()=>{});},[]);
  useEffect(()=>{fetch('/api/play/setup',{cache:'no-store'}).then(async r=>{if(!r.ok)return;const v=await r.json() as PlaySetupState;setPlaySetup({configured:!!v.configured,gcsBucket:v.gcsBucket||null,verifiedAt:v.verifiedAt||null});}).catch(()=>{});},[]);
@@ -99,9 +107,10 @@ export default function Dashboard({page}:{page:string}){
 
  useEffect(()=>{
   const scope=page==='overview'?apps:(current?[current]:[]);
-  if(!scope.length)return;
+  if(!scope.length){markCompare(false);return;}
   const controller=new AbortController();
   setCompare({});
+  markCompare(true);
   Promise.all(scope.map(async a=>{
    const next:CompareRow={};
    if(a.ga4PropertyId){
@@ -116,9 +125,9 @@ export default function Dashboard({page}:{page:string}){
     if(res.ok&&body.status==='success')next.spend=body.data?.spend??0;
    }catch{}
    if(!controller.signal.aborted)setCompare(prev=>({...prev,[a.id]:next}));
-  }));
-  return ()=>controller.abort();
- },[page,current?.id,apps,days,dateRange.startDate,dateRange.endDate,country,os]);
+  })).finally(()=>{if(!controller.signal.aborted)markCompare(false);});
+  return ()=>{controller.abort();markCompare(false);};
+ },[page,current?.id,apps,days,dateRange.startDate,dateRange.endDate,country,os,markCompare]);
 
  if(page!=='overview'&&page!=='progress'&&page!=='connections'&&appsLoaded&&!current){
   return <div className="shell"><div className="workspace"><main><h1>앱을 찾을 수 없습니다</h1><p className="subtitle">등록되지 않았거나 보관된 앱입니다.</p><p className="note"><Link href="/connections">데이터 연결에서 앱 확인</Link></p></main></div></div>;
@@ -175,8 +184,10 @@ export default function Dashboard({page}:{page:string}){
   return [];
  },[page,current?.id]);
 
+ const showHourglass=busy||refreshing||(report&&!appsLoaded);
+
  return <div className="shell">
- <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><button type="button" className="refresh header-refresh" disabled={refreshing} onClick={refreshPage} aria-label="데이터 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><div className="title-with-jumps"><h1>{title}</h1>{!!reportJumps.length&&<SectionJumps items={reportJumps}/>}</div></div></div>
+ <div className={'workspace'+(current?' appreport':'')}><header><div>워크스페이스 <ChevronRight size={13}/><PagePicker page={page} apps={apps} progressLabel={progressLabel}/></div><div className="headeractions"><button type="button" className="refresh header-refresh" disabled={refreshing} onClick={refreshPage} aria-label="데이터 새로고침"><RefreshCw size={14}/> {refreshing?'새로고침 중…':'새로고침'}</button><form method="post" action="/api/auth/logout"><button className="refresh">로그아웃</button></form></div></header><main><LoadingHourglass show={showHourglass}/><div className="titleline"><div><div className="eyebrow">{page==='overview'?'OVERVIEW':current?'APP REPORT':page==='progress'?'PROJECT STATUS':'CONNECTIONS'}</div><div className="title-with-jumps"><h1>{title}</h1>{!!reportJumps.length&&<SectionJumps items={reportJumps}/>}</div></div></div>
  {appsError&&<div className="notice" role="status"><span className="dot"/>{appsError}<button type="button" className="refresh" onClick={()=>{setAppsLoaded(false);setAppsRetry(v=>v+1);}}>다시 시도</button></div>}
  {report&&<><div className="noticefold">
   <button type="button" className="noticefold-toggle" aria-expanded={showNotices} onClick={()=>setShowNotices(v=>!v)}>
@@ -219,13 +230,13 @@ export default function Dashboard({page}:{page:string}){
  {page==='overview'&&appsLoaded&&!apps.length&&!appsError&&<div className="empty"><h2>등록된 앱이 없습니다</h2><p>Connections에서 앱을 추가하세요.</p><p className="note"><Link href="/connections">데이터 연결로 이동</Link></p></div>}
  {page==='overview'&&!!compareApps.length&&<MetricTable rows={compareApps} columns={compareCols} rowKey={a=>a.id} wrapClassName="tablewrap comparewrap" defaultSort={{key:'dau',dir:'desc'}} onRowClick={a=>router.push(`/apps/${a.id}`)} rowTitle={a=>{const row=compare[a.id];return row?.ga4?`세션 ${row.ga4.sessions.toLocaleString()} · 활성 ${row.ga4.activeUsers.toLocaleString()}${row?.admob?` · CTR ${(row.admob.ctr*100).toFixed(2)}%`:''}`:undefined;}}/>}
 
- {page==='overview'&&!!apps.length&&<OverviewCombined apps={apps} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}
- {!!current&&<OverviewCombined apps={[current]} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os}/>}
+ {page==='overview'&&!!apps.length&&<OverviewCombined apps={apps} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} onLoadingChange={markTrends}/>}
+ {!!current&&<OverviewCombined apps={[current]} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} onLoadingChange={markTrends}/>}
 
  {(!!current||page==='overview')&&<>
-  <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={false}/>
-  <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={false}/>
-  <MarketingLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} revenueByApp={revenueByApp} newUsersByApp={newUsersByApp} showCharts={false}/>
+  <GA4Live apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={false} onLoadingChange={markGa4}/>
+  <AdmobLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} country={country} os={os} showCharts={false} onLoadingChange={markAdmob}/>
+  <MarketingLive apps={apps} app={current?.id} days={days} startDate={dateRange.startDate} endDate={dateRange.endDate} revenueByApp={revenueByApp} newUsersByApp={newUsersByApp} showCharts={false} onLoadingChange={markMarketing}/>
  </>}
  {page==='overview'&&!!apps.length&&<p className="note">앱 행을 클릭하면 해당 앱 상세로 이동합니다.</p>}
  </>}

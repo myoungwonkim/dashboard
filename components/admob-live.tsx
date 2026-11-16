@@ -21,9 +21,10 @@ type Result={status:'success',data:Data}|{status:'error',message:string};
 function AppMark({id,name}:{id:string;name:string}){
  return <span className="apptitle"><span className="appdot" style={{background:appColor(id)}} aria-hidden/>{name}</span>;
 }
-export default function AdmobLive({apps,app,days,startDate,endDate,country,os,showCharts=true}:{apps:AppRecord[];app?:string;days:number;startDate:string;endDate:string;country:string;os:string;showCharts?:boolean}){
+export default function AdmobLive({apps,app,days,startDate,endDate,country,os,showCharts=true,onLoadingChange}:{apps:AppRecord[];app?:string;days:number;startDate:string;endDate:string;country:string;os:string;showCharts?:boolean;onLoadingChange?:(loading:boolean)=>void}){
  const [results,setResults]=useState<Record<string,Result>>({}),[users,setUsers]=useState<Record<string,Ga4Users|null>>({}),[loading,setLoading]=useState(true);
  const targets=apps.filter(a=>(a.admobAndroidAppId||a.admobIosAppId)&&(!app||a.id===app));
+ useEffect(()=>{onLoadingChange?.(loading);return ()=>onLoadingChange?.(false);},[loading,onLoadingChange]);
  useEffect(()=>{const c=new AbortController();let active=true;setLoading(true);setResults({});setUsers({});
  if(!targets.length){setLoading(false);return ()=>{active=false;c.abort();};}
  Promise.all(targets.map(async a=>{

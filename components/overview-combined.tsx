@@ -21,7 +21,7 @@ function pickParts(map:PartMap,ids:string[]){
  return ids.map(id=>map[id]||[]).filter(p=>p.length);
 }
 
-export default function OverviewCombined({apps,days,startDate,endDate,country,os}:{apps:AppRecord[];days:number;startDate:string;endDate:string;country:string;os:string}){
+export default function OverviewCombined({apps,days,startDate,endDate,country,os,onLoadingChange}:{apps:AppRecord[];days:number;startDate:string;endDate:string;country:string;os:string;onLoadingChange?:(loading:boolean)=>void}){
  const [loading,setLoading]=useState(true);
  const [activeByApp,setActiveByApp]=useState<PartMap>({});
  const [newByApp,setNewByApp]=useState<PartMap>({});
@@ -31,6 +31,7 @@ export default function OverviewCombined({apps,days,startDate,endDate,country,os
  const [periodSpendByApp,setPeriodSpendByApp]=useState<Record<string,number>>({});
  const appOpts=useMemo(()=>apps.map(a=>({id:a.id,name:a.name})),[apps]);
  const filter=useAppFilter(appOpts);
+ useEffect(()=>{onLoadingChange?.(loading);return ()=>onLoadingChange?.(false);},[loading,onLoadingChange]);
 
  useEffect(()=>{
   const c=new AbortController();let alive=true;setLoading(true);
